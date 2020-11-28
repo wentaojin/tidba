@@ -376,10 +376,15 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 		SQL: query,
 	})
 	if err := queryRows(engine.DB, query, func(row, cols []string) error {
-		if len(row) != 1 {
-			return fmt.Errorf("table [%s.%s] is not column values, should never happen", dbName, tableName)
+		//if len(row) != 1 {
+		//	return fmt.Errorf("table [%s.%s] is not column values, should never happen", dbName, tableName)
+		//}
+		//colValues.Add(row[0])
+		var rows []string
+		for _, r := range row {
+			rows = append(rows, fmt.Sprintf(`'%s'`, r))
 		}
-		colValues.Add(row[0])
+		colValues.Add(strings.Join(rows, ","))
 		return nil
 	}); err != nil {
 		return tableInfo, fmt.Errorf("run SQL [%s] failed: %v", query, err)
@@ -472,7 +477,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 
 	// sort newCols order by asc
 	startTime = time.Now()
-	sortutil.Strings(newCols) // or sortutil.Bytes([][]byte)
+	sortutil.Strings(newCols)
 	endTime = time.Now()
 	// log record
 	zlog.Logger.Info("Run task info",
@@ -577,9 +582,9 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 		//sqlBuf.WriteString(",")
 		// todo: fixed column exist null string
 		if info != "" {
-			sqlBuf.WriteString("('")
+			sqlBuf.WriteString("(")
 			sqlBuf.WriteString(info)
-			sqlBuf.WriteString("')")
+			sqlBuf.WriteString(")")
 			sqlBuf.WriteString(",")
 		}
 	}
