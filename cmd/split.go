@@ -139,8 +139,8 @@ func (app *AppSplit) AppSplitEstimate() Cmder {
 func (app *AppSplitEstimate) Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "estimate",
-		Short:        "Split non-associated index region base estimate data",
-		Long:         `Split non-associated index region base estimate data`,
+		Short:        "Split single and joint index region base estimate data",
+		Long:         `Split single and joint index region base estimate data`,
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
