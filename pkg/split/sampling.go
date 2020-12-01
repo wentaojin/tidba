@@ -20,12 +20,13 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
-	"github.com/WentaoJin/tidba/pkg/db"
 	"os"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/WentaoJin/tidba/pkg/db"
 )
 
 func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, newDB, newTable, newIndex, outDir string, totalWriteRows int) error {
@@ -37,7 +38,7 @@ func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, n
 		newDB:       newDB,
 		newTable:    newTable,
 		newIndex:    newIndex,
-		outFilePath: path.Join(outDir, "split_by_base.sql"),
+		outFilePath: path.Join(outDir, fmt.Sprintf("split_%s_%s_by_base.sql", baseTable, baseIndex)),
 	}
 	err := s.init(engine)
 	if err != nil {
@@ -108,7 +109,19 @@ func (s *splitByBase) generateSplit(regionCount int) error {
 		regionCount = 1
 	}
 	sqlBuf := bytes.NewBuffer(nil)
-	sqlBuf.WriteString(fmt.Sprintf("split table %s index %s by ", s.tableName(s.newDB, s.newTable), s.newIndex))
+	switch {
+	case s.newDB == "" && s.newTable == "":
+		sqlBuf.WriteString(fmt.Sprintf("split table %s index %s by ", s.tableName(s.baseDB, s.baseTable), s.newIndex))
+	case s.newDB != "" && s.newTable == "":
+		sqlBuf.WriteString(fmt.Sprintf("split table %s index %s by ", s.tableName(s.newDB, s.baseTable), s.newIndex))
+	case s.newDB != "" && s.newTable != "":
+		sqlBuf.WriteString(fmt.Sprintf("split table %s index %s by ", s.tableName(s.newDB, s.newTable), s.newIndex))
+	case s.newDB == "" && s.newTable != "":
+		sqlBuf.WriteString(fmt.Sprintf("split table %s index %s by ", s.tableName(s.baseDB, s.newTable), s.newIndex))
+	default:
+		return fmt.Errorf("flag params parse failed: params not support")
+	}
+
 	step := len(s.distinctValues) / regionCount
 	if step < 1 {
 		step = 1
@@ -148,7 +161,7 @@ func (s *splitByBase) getBaseTableIndex(engine *db.Engine) error {
 		IndexName:  s.baseIndex,
 		ColumnName: nil,
 	}
-	condition := fmt.Sprintf("where lower(table_name)=lower('%s') and lower(table_schema)=lower('%s') and lower(KEY_NAME) = lower ('%s')",
+	condition := fmt.Sprintf("where lower(table_name)=lower('%s') and lower(table_schema)=lower('%s') and lower(KEY_NAME) = lower ('%s') order by SEQ_IN_INDEX",
 		s.baseTable, s.baseDB, s.baseIndex)
 	query := fmt.Sprintf("select COLUMN_NAME from INFORMATION_SCHEMA.TIDB_INDEXES %s", condition)
 	err := queryRows(engine.DB, query, func(row, cols []string) error {

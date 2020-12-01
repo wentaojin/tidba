@@ -352,11 +352,11 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	// SQL output flush to file
 	if err := fileWriter.Flush(); err != nil {
 		return tableInfo, fmt.Errorf("split range region SQL wirte into [%v] failed: %v",
-			fmt.Sprintf("%s/split_index_%s_%s.SQL", tableInfo.OutDir, tableInfo.TableName, tableInfo.IndexName), err)
+			fmt.Sprintf("%s/split_%s_%s_by_estimate.sql", tableInfo.OutDir, tableInfo.TableName, tableInfo.IndexName), err)
 	}
 	if err := file.Close(); err != nil {
 		return tableInfo, fmt.Errorf("os file [%v] close failed: %v",
-			fmt.Sprintf("%s/split_index_%s_%s.SQL", tableInfo.OutDir, tableInfo.TableName, tableInfo.IndexName), err)
+			fmt.Sprintf("%s/split_%s_%s_by_estimate.sql", tableInfo.OutDir, tableInfo.TableName, tableInfo.IndexName), err)
 	}
 
 	return tableInfo, nil
