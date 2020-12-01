@@ -303,9 +303,9 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 		return tableInfo, err
 	}
 
-	outFile, err := os.OpenFile(fmt.Sprintf("%s/split_range_%s.SQL", tableInfo.OutDir, tableInfo.TableName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	outFile, err := os.OpenFile(fmt.Sprintf("%s/split_range_%s.sql", tableInfo.OutDir, tableInfo.TableName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
-		return tableInfo, fmt.Errorf("open file [%s] failed: %v", fmt.Sprintf("%s/split_range_%s.SQL", tableInfo.OutDir, tableInfo.TableName), err)
+		return tableInfo, fmt.Errorf("open file [%s] failed: %v", fmt.Sprintf("%s/split_range_%s.sql", tableInfo.OutDir, tableInfo.TableName), err)
 	}
 	var (
 		fileWriter *bufio.Writer
@@ -471,10 +471,10 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 
 	// SQL output flush to file
 	if err := fileWriter.Flush(); err != nil {
-		return tableInfo, fmt.Errorf("split range region SQL wirte into [%v] failed: %v", fmt.Sprintf("%s/split_range_%s.SQL", tableInfo.OutDir, tableInfo.TableName), err)
+		return tableInfo, fmt.Errorf("split range region SQL wirte into [%v] failed: %v", fmt.Sprintf("%s/split_range_%s.sql", tableInfo.OutDir, tableInfo.TableName), err)
 	}
 	if err := file.Close(); err != nil {
-		return tableInfo, fmt.Errorf("os file [%v] close failed: %v", fmt.Sprintf("%s/split_range_%s.SQL", tableInfo.OutDir, tableInfo.TableName), err)
+		return tableInfo, fmt.Errorf("os file [%v] close failed: %v", fmt.Sprintf("%s/split_range_%s.sql", tableInfo.OutDir, tableInfo.TableName), err)
 	}
 
 	return tableInfo, nil

@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"math"
 	"os"
 	"path"
 	"strconv"
@@ -79,7 +80,6 @@ func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, n
 
 	s.close()
 	endTime := time.Now()
-	// log record
 	zlog.Logger.Info("Run task info",
 		zap.String("generate split table sql total cost time", endTime.Sub(startTime).String()),
 	)
@@ -229,21 +229,25 @@ func (s *splitByBase) calculateRegionNum(engine *db.Engine, totalWriteRows int) 
 		baseIndexRegions = 1
 	}
 	capacity := baseRows / baseIndexRegions
+	// To prevent too little data stored in the region, generally a region can store 10,000 indexes,
+	// Because too many regions are not good
 	if capacity < 10000 {
 		capacity = 10000
 	}
-	count := totalWriteRows / capacity
+
+	//count := totalWriteRows / capacity
+	count := math.Ceil(float64(totalWriteRows) / float64(capacity))
 	if count < 1 {
 		count = 1
 	}
 	endTime = time.Now()
 	zlog.Logger.Info("Run task info",
 		zap.Int("get base table index regions", baseIndexRegions),
-		zap.Int("sampling split table index regions", count),
+		zap.Int("sampling split table index regions", int(count)),
 		zap.String("cost time", endTime.Sub(startTime).String()),
 	)
 
-	return count, nil
+	return int(count), nil
 }
 
 func (s *splitByBase) getBaseTableCount(engine *db.Engine) (int, error) {
