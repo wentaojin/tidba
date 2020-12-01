@@ -209,9 +209,9 @@ func (app *AppSplitEstimate) RunE(cmd *cobra.Command, args []string) error {
 type AppSplitSampling struct {
 	*AppSplit         // embedded parent command storage
 	EstimateTableRows int
-	EstimateTableSize int
-	RegionSize        int
-	ColumnName        string
+	BaseDbName        string
+	BaseTableName     string
+	BaseIndexName     string
 	NewDbName         string
 	NewTableName      string
 	NewIndexName      string
@@ -225,67 +225,68 @@ func (app *AppSplit) AppSplitSampling() Cmder {
 func (app *AppSplitSampling) Cmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:          "sampling",
-		Short:        "Split single and joint index region base sampling data",
-		Long:         `Split single and joint index region base sampling data`,
+		Short:        "Generate split region from the distinct value of base table index",
+		Long:         `Generate split region from the distinct value of base table index`,
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
 
 	cmd.Flags().IntVar(&app.EstimateTableRows, "new-table-row", 0, "estimate need be split table rows")
-	cmd.Flags().IntVar(&app.EstimateTableSize, "new-table-size", 0, "estimate need be split table size(M)")
-	cmd.Flags().IntVar(&app.RegionSize, "region-size", 96, "estimate need be split table region size(M)")
-	cmd.Flags().StringVar(&app.ColumnName, "col", "", "configure base estimate table column name")
+	cmd.Flags().StringVar(&app.BaseDbName, "base-db", "", "base estimate table db name")
+	cmd.Flags().StringVar(&app.BaseTableName, "base-table", "", "base estimate table name")
+	cmd.Flags().StringVar(&app.BaseIndexName, "base-index", "", "base estimate table index name")
 	cmd.Flags().StringVar(&app.NewDbName, "new-db", "", "configure generate split table new db name through base estimate table column name")
 	cmd.Flags().StringVar(&app.NewTableName, "new-table", "", "configure generate split table new table name through base estimate table column name")
 	cmd.Flags().StringVar(&app.NewIndexName, "new-index", "", "configure generate split table index name through base estimate table column name")
 	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
-
 	return cmd
 }
 
-func (app *AppSplitSampling) RunE(cmd *cobra.Command, args []string) error {
-	if app.DBName == "" {
-		return fmt.Errorf("flag db name is requirement, can not null")
+func (app *AppSplitSampling) validateParameters() error {
+	msg := "flag `%s` is requirement, can not null"
+	if app.BaseDbName == "" {
+		return fmt.Errorf(msg, "base-db")
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	if app.BaseTableName == "" {
+		return fmt.Errorf(msg, "base-table")
+	}
+	if app.BaseIndexName == "" {
+		return fmt.Errorf(msg, "base-index")
+	}
+	if app.NewDbName == "" {
+		return fmt.Errorf(msg, "new-db")
+	}
+	if app.NewTableName == "" {
+		return fmt.Errorf(msg, "new-table")
+	}
+	if app.NewIndexName == "" {
+		return fmt.Errorf(msg, "new-index")
+	}
+	if app.EstimateTableRows == 0 {
+		return fmt.Errorf(msg, "new-table-row")
+	}
+	return nil
+}
+
+func (app *AppSplitSampling) RunE(cmd *cobra.Command, args []string) error {
+	err := app.validateParameters()
 	if err != nil {
 		return err
 	}
-	if !engine.IsExistDbName(app.DBName) {
+	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.BaseDbName)
+	if err != nil {
 		return err
 	}
 
-	//only support single table
-	switch {
-	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "":
-		if len(app.IncludeTable) != 1 {
-			return fmt.Errorf(" flag include only support configre single table")
-		}
-		if app.NewIndexName == "" {
-			return fmt.Errorf("flag new index name is requirement, can not null")
-
-		}
-		if err := split.IncludeTableSplitEstimate(engine,
-			app.DBName,
-			app.IncludeTable[0],
-			app.ColumnName,
-			app.NewDbName,
-			app.NewTableName,
-			app.NewIndexName,
-			app.EstimateTableRows,
-			app.EstimateTableSize,
-			app.RegionSize,
-			app.Concurrency,
-			app.OutDir); err != nil {
-			return err
-		}
-	default:
-		if err := cmd.Help(); err != nil {
-			return err
-		}
-		return fmt.Errorf("only support configre flag include, and only single table")
-	}
-	return nil
+	return split.GenerateSplitByBaseTable(engine,
+		app.BaseDbName,
+		app.BaseTableName,
+		app.BaseIndexName,
+		app.NewDbName,
+		app.NewTableName,
+		app.NewIndexName,
+		app.OutDir,
+		app.EstimateTableRows)
 }
 
 /*
