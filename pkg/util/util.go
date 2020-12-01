@@ -16,6 +16,8 @@ limitations under the License.
 package util
 
 import (
+	"fmt"
+	"io/ioutil"
 	"os"
 	"reflect"
 	"regexp"
@@ -174,7 +176,7 @@ func Int(slice []int) []int {
 	return result
 }
 
-//UniqueStrings returns unique string values in a slice
+// UniqueStrings returns unique string values in a slice
 func UniqueStrings(slice []string) []string {
 	uMap := make(map[string]struct{})
 	result := []string{}
@@ -185,4 +187,17 @@ func UniqueStrings(slice []string) []string {
 		result = append(result, key)
 	}
 	return result
+}
+
+// GetFileNameFromDir get all file name from dir
+func GetFileNameByRegexp(path, rep string) []string {
+	files, _ := ioutil.ReadDir(path)
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		} else {
+			fmt.Println(file.Name())
+		}
+	}
+	return nil
 }

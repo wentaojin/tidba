@@ -203,6 +203,168 @@ func (app *AppSplitEstimate) RunE(cmd *cobra.Command, args []string) error {
 }
 
 /*
+	Base estimate split
+*/
+
+type AppSplitSampling struct {
+	*AppSplit         // embedded parent command storage
+	EstimateTableRows int
+	EstimateTableSize int
+	RegionSize        int
+	ColumnName        string
+	NewDbName         string
+	NewTableName      string
+	NewIndexName      string
+	OutDir            string
+}
+
+func (app *AppSplit) AppSplitSampling() Cmder {
+	return &AppSplitSampling{AppSplit: app}
+}
+
+func (app *AppSplitSampling) Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "sampling",
+		Short:        "Split single and joint index region base sampling data",
+		Long:         `Split single and joint index region base sampling data`,
+		RunE:         app.RunE,
+		SilenceUsage: true,
+	}
+
+	cmd.Flags().IntVar(&app.EstimateTableRows, "new-table-row", 0, "estimate need be split table rows")
+	cmd.Flags().IntVar(&app.EstimateTableSize, "new-table-size", 0, "estimate need be split table size(M)")
+	cmd.Flags().IntVar(&app.RegionSize, "region-size", 96, "estimate need be split table region size(M)")
+	cmd.Flags().StringVar(&app.ColumnName, "col", "", "configure base estimate table column name")
+	cmd.Flags().StringVar(&app.NewDbName, "new-db", "", "configure generate split table new db name through base estimate table column name")
+	cmd.Flags().StringVar(&app.NewTableName, "new-table", "", "configure generate split table new table name through base estimate table column name")
+	cmd.Flags().StringVar(&app.NewIndexName, "new-index", "", "configure generate split table index name through base estimate table column name")
+	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
+
+	return cmd
+}
+
+func (app *AppSplitSampling) RunE(cmd *cobra.Command, args []string) error {
+	if app.DBName == "" {
+		return fmt.Errorf("flag db name is requirement, can not null")
+	}
+	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	if err != nil {
+		return err
+	}
+	if !engine.IsExistDbName(app.DBName) {
+		return err
+	}
+
+	//only support single table
+	switch {
+	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "":
+		if len(app.IncludeTable) != 1 {
+			return fmt.Errorf(" flag include only support configre single table")
+		}
+		if app.NewIndexName == "" {
+			return fmt.Errorf("flag new index name is requirement, can not null")
+
+		}
+		if err := split.IncludeTableSplitEstimate(engine,
+			app.DBName,
+			app.IncludeTable[0],
+			app.ColumnName,
+			app.NewDbName,
+			app.NewTableName,
+			app.NewIndexName,
+			app.EstimateTableRows,
+			app.EstimateTableSize,
+			app.RegionSize,
+			app.Concurrency,
+			app.OutDir); err != nil {
+			return err
+		}
+	default:
+		if err := cmd.Help(); err != nil {
+			return err
+		}
+		return fmt.Errorf("only support configre flag include, and only single table")
+	}
+	return nil
+}
+
+/*
+	Base csv split
+*/
+
+type AppSplitCSV struct {
+	*AppSplit         // embedded parent command storage
+	Separator         string
+	Delimiter         string
+	Header            bool
+	NotNull           bool
+	Null              string
+	TrimLastSep       bool
+	BackslashEscape   bool
+	EstimateTableSize int
+	RegionSize        int
+	ShardRowIDBits    int
+	DataDir           string
+	OutDir            string
+}
+
+func (app *AppSplit) AppSplitCSV() Cmder {
+	return &AppSplitCSV{AppSplit: app}
+}
+
+func (app *AppSplitCSV) Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "csv",
+		Short:        "Split single and joint index region base csv data",
+		Long:         `Split single and joint index region base csv data`,
+		RunE:         app.RunE,
+		SilenceUsage: true,
+	}
+
+	cmd.Flags().StringVar(&app.Separator, "separator", ",", "the field separator must be a single ASCII character")
+	cmd.Flags().StringVar(&app.Delimiter, "delimiter", string('"'), "quote delimiter, if delimiter is empty, all fields will be dereferenced")
+	cmd.Flags().BoolVar(&app.Header, "header", true, "all CSV files contain header rows. If true, the first row will be used as the column name. If it is false, the first row has no special characteristics and is processed as a normal data row")
+	cmd.Flags().BoolVar(&app.NotNull, "not-null", false, "whether the CSV contains NULL, if true, no column of the CSV file can be parsed as NULL")
+	cmd.Flags().StringVar(&app.Null, "null", "\\N'", "if `not-null` is false (ie CSV can contain NULL), Fields with the following values ​​will be parsed as NULL.")
+	cmd.Flags().BoolVar(&app.TrimLastSep, "trim-last-step", false, "treat the separator field as a terminator, whether to remove the line ending with the separator")
+	cmd.Flags().BoolVar(&app.BackslashEscape, "backslash-escape", true, "whether to parse the backslash escape character in the field")
+	cmd.Flags().IntVar(&app.EstimateTableSize, "new-table-size", 0, "estimate need be split table size(M)")
+	cmd.Flags().IntVar(&app.RegionSize, "region-size", 96, "estimate need be split table region size(M)")
+	cmd.Flags().IntVar(&app.ShardRowIDBits, "shard-rowid-bits", 6, "estimate need be split table character primary key tidb row id scatter")
+	cmd.Flags().StringVar(&app.DataDir, "data-dir", "/tmp/split", "csv file store data dir")
+	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
+	return cmd
+}
+
+func (app *AppSplitCSV) RunE(cmd *cobra.Command, args []string) error {
+	if app.DBName == "" {
+		return fmt.Errorf("flag db name is requirement, can not null")
+	}
+	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	if err != nil {
+		return err
+	}
+	if !engine.IsExistDbName(app.DBName) {
+		return err
+	}
+
+	//only support single table
+	switch {
+	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "":
+		if len(app.IncludeTable) != 1 {
+			return fmt.Errorf(" flag include only support configre single table")
+		}
+
+	default:
+		if err := cmd.Help(); err != nil {
+			return err
+		}
+		return fmt.Errorf("only support configre flag include, and only single table")
+	}
+	return nil
+}
+
+/*
 	Base key split
 */
 type AppSplitKey struct {

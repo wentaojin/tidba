@@ -23,19 +23,15 @@ import (
 	"math"
 	"os"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/twotwotwo/sorts/sortutil"
-
-	"github.com/WentaoJin/tidba/zlog"
-	"go.uber.org/zap"
 
 	"github.com/WentaoJin/tidba/pkg/db"
 	"github.com/WentaoJin/tidba/pkg/util"
+	"github.com/WentaoJin/tidba/zlog"
+	"go.uber.org/zap"
 )
 
-func IncludeTableSplitEstimate(engine *db.Engine, dbName string, tableName string, columnName string, newDbName, newTableName, indexName string,
+func IncludeTableSplitSampling(engine *db.Engine, dbName string, tableName string, columnName string, newDbName, newTableName, indexName string,
 	estimateTableRows, estimateTableSize, regionSize int, concurrency int, outDir string) error {
 
 	var includeTables []string
@@ -52,7 +48,7 @@ func IncludeTableSplitEstimate(engine *db.Engine, dbName string, tableName strin
 		return fmt.Errorf("db [%s] table '%v' not exist", dbName, notExistTables)
 	}
 
-	tableInfo, err := runSplitTableEstimate(engine, dbName, tableName, columnName, newDbName, newTableName, indexName, estimateTableRows, estimateTableSize, regionSize, concurrency, outDir)
+	tableInfo, err := runSplitTableSampling(engine, dbName, tableName, columnName, newDbName, newTableName, indexName, estimateTableRows, estimateTableSize, regionSize, concurrency, outDir)
 	if err != nil {
 		zlog.Logger.Fatal("Task execute failed",
 			zap.Error(err),
@@ -71,11 +67,11 @@ func IncludeTableSplitEstimate(engine *db.Engine, dbName string, tableName strin
 }
 
 /*
-	Split estimate
+	Split sampling
 */
 
-// split table region by estimate
-type EstimateTableInfo struct {
+// split table region by sampling
+type SamplingTableInfo struct {
 	DbName    string
 	TableName string
 	IndexName string
@@ -84,14 +80,14 @@ type EstimateTableInfo struct {
 	CostTime  string
 }
 
-func runSplitTableEstimate(engine *db.Engine, dbName string, tableName string, columnName string, newDbName, newTableName, indexName string,
-	estimateTableRows, estimateTableSize, regionSize int, concurrency int, outDir string) (EstimateTableInfo, error) {
+func runSplitTableSampling(engine *db.Engine, dbName string, tableName string, columnName string, newDbName, newTableName, indexName string,
+	estimateTableRows, estimateTableSize, regionSize int, concurrency int, outDir string) (SamplingTableInfo, error) {
 	var (
-		tableInfo EstimateTableInfo
+		tableInfo SamplingTableInfo
 		err       error
 	)
 	startTime := time.Now()
-	tableInfo, err = splitEstimateTableRun(engine, dbName, tableName, columnName, newDbName, newTableName, indexName, estimateTableRows, estimateTableSize, regionSize, concurrency, outDir)
+	tableInfo, err = splitSamplingTableRun(engine, dbName, tableName, columnName, newDbName, newTableName, indexName, estimateTableRows, estimateTableSize, regionSize, concurrency, outDir)
 	endTime := time.Now()
 	if err != nil {
 		tableInfo.CostTime = endTime.Sub(startTime).String()
@@ -102,10 +98,10 @@ func runSplitTableEstimate(engine *db.Engine, dbName string, tableName string, c
 	return tableInfo, nil
 }
 
-// splitEstimateTableRun is used to generate split table estimate
-func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, columnName string, newDbName, newTableName, newIndexName string,
-	estimateTableRows, estimateTableSize, regionSize int, concurrency int, outDir string) (EstimateTableInfo, error) {
-	var tableInfo EstimateTableInfo
+// splitSamplingTableRun is used to generate split table sampling
+func splitSamplingTableRun(engine *db.Engine, dbName string, tableName string, columnName string, newDbName, newTableName, newIndexName string,
+	estimateTableRows, estimateTableSize, regionSize int, concurrency int, outDir string) (SamplingTableInfo, error) {
+	var tableInfo SamplingTableInfo
 	tableInfo.DbName = dbName
 	tableInfo.IndexName = newIndexName
 	tableInfo.OutDir = outDir
@@ -128,10 +124,6 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 		SQL: query,
 	})
 	if err := queryRows(engine.DB, query, func(row, cols []string) error {
-		//if len(row) != 1 {
-		//	return fmt.Errorf("table [%s.%s] is not column values, should never happen", dbName, tableName)
-		//}
-		//colValues.Add(row[0])
 		var rows []string
 		for _, r := range row {
 			rows = append(rows, fmt.Sprintf(`'%s'`, r))
@@ -162,97 +154,16 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	// number of samples for each unique value
 	colCounts := math.Ceil(float64(estimateTableRows) / float64(len(valueCols)))
 
-	// fill the estimate table rows， approximately equal to estimateTableRows
-	startTime = time.Now()
-	// split array
-	var (
-		colsInfo          [][]string
-		splitColsInfoNums int
-	)
-
-	// concurrency limits
-	// Less than 2048000, processed at once
-	if len(valueCols) <= concurrency {
-		// log record
-		zlog.Logger.Fatal("Run task info",
-			zap.String("appear error", fmt.Sprintf(`origin cols distinct value [%d] is not equal to concurrency value [%d], not need split region or reduce flag concurrency value`, len(valueCols), concurrency)),
-		)
-	} else {
-		// split array
-		splitColsInfoNums = int(math.Ceil(float64(len(valueCols)) / float64(concurrency)))
-		colsInfo = make([][]string, splitColsInfoNums)
-		// paginate offset
-		offset := 0
-		for i := 0; i < splitColsInfoNums; i++ {
-			colsInfo[i] = append(colsInfo[i], util.Paginate(valueCols, offset, concurrency)...)
-			offset = offset + concurrency
-		}
-	}
-	endTime = time.Now()
-	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("split origin cols value total time", endTime.Sub(startTime).String()),
-	)
-
-	// store column values include repeat
-	var (
-		newCols []string
-	)
-	// origin append
-	//for j := 0; j < int(colCounts); j++ {
-	//	newCols = append(newCols, colsValue...)
-	//}
-	// todo: need speed
-	var wg sync.WaitGroup
-	c := make(chan struct{})
-
-	startTime = time.Now()
-	// after the job is created, the job is ready to receive data from the channel
-	s := util.NewScheduleJob(len(colsInfo), int(colCounts), func() { c <- struct{}{} })
-	wg.Add(len(colsInfo))
-	for i := 0; i < len(colsInfo); i++ {
-		go func(v []string) {
-			defer wg.Done()
-			s.AddData(v)
-		}(colsInfo[i])
-	}
-	wg.Wait()
-	s.Close()
-	<-c
-	endTime = time.Now()
-	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("generate new cols total time", endTime.Sub(startTime).String()),
-	)
-
-	newCols = s.Data
-
-	// sort newCols order by asc
-	startTime = time.Now()
-	sortutil.Strings(newCols)
-	endTime = time.Now()
-	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("sort new cols total time", endTime.Sub(startTime).String()),
-	)
-
-	// determine whether the sorted value is equal to before
-	totalCols := len(valueCols) * int(colCounts)
-	if len(newCols) != totalCols {
-		// log record
-		zlog.Logger.Fatal("Run task info",
-			zap.String("appear error", fmt.Sprintf("sort new cols value [%d] is not equal to origin value [%d]", len(newCols), totalCols)),
-		)
-	}
 	// estimate split region numbers - counts
 	regionCounts := math.Ceil(float64(estimateTableSize) / float64(regionSize))
 
 	// rounded up, for example: 2.5 = 3
 	// get avg one region store how much table rows data
-	oneRegionStep := math.Ceil(float64(len(newCols)) / regionCounts)
+	newTableRows := len(valueCols) * int(colCounts)
+	oneRegionStep := math.Ceil(float64(newTableRows) / regionCounts)
 
 	// split array by segments
-	splitNums := math.Ceil(float64(len(newCols)) / oneRegionStep)
+	splitNums := math.Ceil(float64(newTableRows) / oneRegionStep)
 
 	// log record
 	zlog.Logger.Info("Run task info",
@@ -260,7 +171,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 		zap.String("distinct max value", valueCols[len(valueCols)-1]),
 		zap.Int("distinct value nums", len(valueCols)),
 		zap.Int("factor", int(colCounts)),
-		zap.Int("estimate rows", len(newCols)),
+		zap.Int("estimate rows", newTableRows),
 		zap.Float64("estimate split region nums", regionCounts),
 		zap.Float64("one region rows", oneRegionStep),
 		zap.Float64("real split region nums", splitNums),
