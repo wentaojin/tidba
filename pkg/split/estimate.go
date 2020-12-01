@@ -128,10 +128,6 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 		SQL: query,
 	})
 	if err := queryRows(engine.DB, query, func(row, cols []string) error {
-		//if len(row) != 1 {
-		//	return fmt.Errorf("table [%s.%s] is not column values, should never happen", dbName, tableName)
-		//}
-		//colValues.Add(row[0])
 		var rows []string
 		for _, r := range row {
 			rows = append(rows, fmt.Sprintf(`'%s'`, r))
