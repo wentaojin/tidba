@@ -25,6 +25,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/WentaoJin/tidba/zlog"
+	"go.uber.org/zap"
 
 	"github.com/WentaoJin/tidba/pkg/db"
 )
@@ -38,8 +42,9 @@ func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, n
 		newDB:       newDB,
 		newTable:    newTable,
 		newIndex:    newIndex,
-		outFilePath: path.Join(outDir, fmt.Sprintf("split_%s_%s_by_base.sql", baseTable, baseIndex)),
+		outFilePath: path.Join(outDir, fmt.Sprintf("split_%s_%s_by_sampling.sql", baseTable, baseIndex)),
 	}
+	startTime := time.Now()
 	err := s.init(engine)
 	if err != nil {
 		return err
@@ -73,6 +78,11 @@ func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, n
 	}
 
 	s.close()
+	endTime := time.Now()
+	// log record
+	zlog.Logger.Info("Run task info",
+		zap.String("generate split table sql total cost time", endTime.Sub(startTime).String()),
+	)
 	return nil
 }
 
@@ -181,6 +191,7 @@ func (s *splitByBase) getBaseTableIndex(engine *db.Engine) error {
 }
 
 func (s *splitByBase) getBaseDistinctValues(engine *db.Engine) error {
+	startTime := time.Now()
 	idxCols := strings.Join(s.baseIndexInfo.ColumnName, ",")
 	query := fmt.Sprintf("select distinct %s from %s order by %s",
 		idxCols, s.tableName(s.baseDB, s.baseTable), idxCols)
@@ -189,14 +200,27 @@ func (s *splitByBase) getBaseDistinctValues(engine *db.Engine) error {
 		return err
 	}
 	s.distinctValues = rows
+	endTime := time.Now()
+	// log record
+	zlog.Logger.Info("Run task info",
+		zap.String("get base table distinct values", endTime.Sub(startTime).String()),
+	)
+
 	return nil
 }
 
 func (s *splitByBase) calculateRegionNum(engine *db.Engine, totalWriteRows int) (int, error) {
+	startTime := time.Now()
 	baseRows, err := s.getBaseTableCount(engine)
 	if err != nil {
 		return 0, err
 	}
+	endTime := time.Now()
+	zlog.Logger.Info("Run task info",
+		zap.String("get base table record counts", endTime.Sub(startTime).String()),
+	)
+
+	startTime = time.Now()
 	baseIndexRegions, err := s.getBaseTableIndexRegionCount(engine)
 	if err != nil {
 		return 0, err
@@ -212,6 +236,13 @@ func (s *splitByBase) calculateRegionNum(engine *db.Engine, totalWriteRows int) 
 	if count < 1 {
 		count = 1
 	}
+	endTime = time.Now()
+	zlog.Logger.Info("Run task info",
+		zap.Int("get base table index regions", baseIndexRegions),
+		zap.Int("sampling split table index regions", count),
+		zap.String("cost time", endTime.Sub(startTime).String()),
+	)
+
 	return count, nil
 }
 

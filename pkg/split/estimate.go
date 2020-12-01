@@ -299,9 +299,9 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	} else {
 		tableInfo.TableName = tableName
 	}
-	outFile, err := os.OpenFile(fmt.Sprintf("%s/split_index_%s_%s.SQL", tableInfo.OutDir, tableInfo.TableName, tableInfo.IndexName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
+	outFile, err := os.OpenFile(fmt.Sprintf("%s/split_%s_%s_by_estimate.sql", tableInfo.OutDir, tableInfo.TableName, tableInfo.IndexName), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0644)
 	if err != nil {
-		return tableInfo, fmt.Errorf("open file [%s] failed: %v", fmt.Sprintf("%s/split_index_%s_%s.SQL", tableInfo.OutDir, tableInfo.TableName, tableInfo.IndexName), err)
+		return tableInfo, fmt.Errorf("open file [%s] failed: %v", fmt.Sprintf("%s/split_%s_%s_by_estimate.sql", tableInfo.OutDir, tableInfo.TableName, tableInfo.IndexName), err)
 	}
 	fileWriter, file = bufio.NewWriter(outFile), outFile
 
