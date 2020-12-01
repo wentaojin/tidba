@@ -328,7 +328,8 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 		//sqlBuf.WriteString(info)
 		//sqlBuf.WriteString("')")
 		//sqlBuf.WriteString(",")
-		// todo: fixed column exist null string
+
+		// fixed column exist null string
 		if info != "" {
 			sqlBuf.WriteString("(")
 			sqlBuf.WriteString(info)
