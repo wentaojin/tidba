@@ -75,7 +75,7 @@ func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, n
 
 	err = s.generateSplit(regionCount)
 	if err != nil {
-		return err2
+		return err
 	}
 
 	s.close()
