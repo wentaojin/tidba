@@ -32,17 +32,6 @@ type OperatorDB interface {
 	QuerySQL(querySQL string) (cols []string, res []map[string]string, err error)
 }
 
-type ConvertDB interface {
-	GetSchemaMeta() (schemaMeta []string)
-	GetTableMeta(schemaName string) (tableMeta []map[string]string)
-	GetViewMeta(schemaName, viewName string) (viewMeta []map[string]string)
-	GetTableColumnMeta(schemaName string, tableName string) (colMeta []map[string]string)
-	GetTablePrimaryKey(schemaName string, tableName string) (pkList []map[string]string)
-	GetTableUniqueKey(schemaName string, tableName string) (ukList []map[string]string)
-	GetTableForeignKey(schemaName string, tableName string) (fkList []map[string]string)
-	GetTableIndexMeta(schemaName string, tableName string) (idxMeta []map[string]string)
-}
-
 // General query returns table field columns and corresponding field row data
 func GeneralQuery(db *sql.DB, querySQL string) ([]string, []map[string]string, error) {
 	var (
