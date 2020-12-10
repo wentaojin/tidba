@@ -15,6 +15,12 @@ limitations under the License.
 */
 package main
 
+import (
+	"bytes"
+	"fmt"
+	"strings"
+)
+
 // start with two slightly different json documents
 var aJSON = []byte(`{
   "a": 100,
@@ -47,5 +53,17 @@ var bJSON = []byte(`{
 }`)
 
 func main() {
+	var dt []byte
+	msg := `"{\"name\\\":\"zhangsan\", \"age\":18, \"id\":122463,\"sid\":122464}"`
 
+	dt = bytes.Trim([]byte(msg), "\"")
+
+	fmt.Println(string(dt))
+
+	var s []string
+	for _, v := range bytes.SplitN([]byte(dt), []byte("\\"), -1) {
+		s = append(s, string(v))
+	}
+	data := strings.Join(s, "")
+	fmt.Println(data)
 }

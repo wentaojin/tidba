@@ -92,12 +92,13 @@ func ComponentTiKVDiffByAPI(baseTiKVAddr, newTiKVAddr, outFile string) error {
 
 func ComponentTiKVDiffByJSON(baseTiKVJson, newTiKVAddr, outFile string) error {
 	var (
-		baseTiKVJSON, newTiKVJson, fileName string
-		err                                 error
-		opts                                []Option
-		w                                   io.Writer
-		stdout                              io.Writer
-		au                                  aurora.Aurora
+		baseTiKVJSON          []byte
+		newTiKVJson, fileName string
+		err                   error
+		opts                  []Option
+		w                     io.Writer
+		stdout                io.Writer
+		au                    aurora.Aurora
 	)
 	if baseTiKVJSON, fileName, err = ReadJSONFile(baseTiKVJson); err != nil {
 		return err
@@ -124,7 +125,7 @@ func ComponentTiKVDiffByJSON(baseTiKVJson, newTiKVAddr, outFile string) error {
 	}
 
 	jsonFmtFn := NewJSONFormatFunc(true)
-	hunks, err := Diff([]byte(baseTiKVJSON), []byte(newTiKVJson), opts...)
+	hunks, err := Diff(baseTiKVJSON, []byte(newTiKVJson), opts...)
 	if err != nil {
 		return fmt.Errorf("Error: diff by json failed: %s\n", err)
 	}

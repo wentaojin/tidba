@@ -23,8 +23,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 
 	"github.com/logrusorgru/aurora"
 )
@@ -68,46 +66,33 @@ func WriteHunk(w io.Writer, au aurora.Aurora, hunk Hunk, jsonFormatFn func(strin
 	return nil
 }
 
-func ReadJSONFile(name string) (string, string, error) {
-	var data string
+func ReadJSONFile(name string) ([]byte, string, error) {
+	var (
+		data [][]byte
+		dt   []byte
+	)
 	fileName := filepath.Base(name)
 	file, err := os.Open(name)
 	if err != nil {
-		return data, fileName, err
+		return dt, fileName, fmt.Errorf("os open file [%s] failed: %v", name, err)
 	}
 	defer file.Close()
 
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
-		return data, fileName, err
+		return dt, fileName, fmt.Errorf("ioutil read file [%s] failed: %v", name, err)
 	}
 
-	data = string(content)
-
-	if !strings.HasPrefix(data, "\"") {
-		data = "\"" + data
-	}
-	if !strings.HasSuffix(data, "\"") {
-		data = data + "\""
+	// remove escape character \
+	for _, v := range bytes.SplitN(content, []byte("\\"), -1) {
+		data = append(data, v)
 	}
 
-	data, err = strconv.Unquote(data)
-	if err != nil {
-		return data, fileName, err
-	}
-	return data, fileName, nil
-}
-
-func encodeJson(v interface{}) ([]byte, error) {
-	var buf bytes.Buffer
-	encoder := json.NewEncoder(&buf)
-
-	encoder.SetEscapeHTML(false)
-
-	if err := encoder.Encode(v); err != nil {
-		return nil, err
+	dt = bytes.Join(data, []byte(""))
+	var config map[string]interface{}
+	if err := json.Unmarshal(dt, &config); err != nil {
+		return dt, fileName, fmt.Errorf("json.Unmarshal string [%s] failed: %v", name, err)
 	}
 
-	return buf.Bytes(), nil
-
+	return dt, fileName, nil
 }
