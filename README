@@ -104,6 +104,9 @@ $ ./tidba diff tidb --help
 
 -- 对比 tikv 配置文件参数
 $ ./tidba diff tikv --help
+
+v3.0 json 获取 tikv 日志配置（只有 v3.0 版本需要）,将 config 等于号后面的双引号中的内容全部复制倒另外一个文件内（注意不能带有双引号复制），用于 diff 对比
+[2020/12/05 14:29:53.717 +08:00] [INFO] [server.rs:51] ["using config"] [config="{\"log-level\":\"info\",\"log-file\":\"/data1/nightly/tikv-41260/log/tikv.log\",....}"]
 ```
 
 migrate - 考虑 oracle 特有依赖, migrate 单独 repo 
