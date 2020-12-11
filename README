@@ -89,7 +89,7 @@ $./tidba split estimate --help
 $./tidba split sampling --help
 
 -- 基于基础采样表，根据 distinct 生成打散（数据量大的情况下,资源耗用主要位于数据库）
-$./tidba split sampling --help
+$./tidba split reckon --help
 
 ```
 
