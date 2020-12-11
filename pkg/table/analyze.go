@@ -29,7 +29,7 @@ func IncludeTableAnalyze(dbName string, concurrency int, includeTables []string,
 		return err
 	}
 
-	isSubset, notExistTables := util.IsExistIncludeTable(allTables, includeTables)
+	isSubset, notExistTables := util.IsExistInclude(allTables, includeTables)
 	if !isSubset {
 		return fmt.Errorf("db %s table '%v' not exist", dbName, notExistTables)
 	}
@@ -63,7 +63,7 @@ func FilterTableAnalyze(dbName string, concurrency int, excludeTables []string, 
 		return err
 	}
 	var tasks []Task
-	for i, t := range util.FilterFromAllTables(allTables, excludeTables) {
+	for i, t := range util.FilterFromAll(allTables, excludeTables) {
 		tasks = append(tasks, Task{
 			TaskID: i,
 			SQL:    fmt.Sprintf("analyze table %s.%s", dbName, t),
@@ -91,7 +91,7 @@ func RegexpTableAnalyze(dbName string, concurrency int, regex string, engine *db
 	if err != nil {
 		return err
 	}
-	for i, t := range util.RegexpFromAllTables(allTables, regex) {
+	for i, t := range util.RegexpFromAll(allTables, regex) {
 		tasks = append(tasks, Task{
 			TaskID: i,
 			Engine: engine,

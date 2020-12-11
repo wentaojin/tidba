@@ -1,0 +1,11 @@
+-- USER EXPORT CREATE
+CREATE USER marvin@'%' identified by password'*AE637A5944136AB0BA8ABCD07DE27F8362ECAF46';
+
+
+-- SHOW GRANTS FOR 'marvin'@'%'
+GRANT USAGE ON *.* TO 'marvin'@'%';;
+GRANT ALL PRIVILEGES ON rock.* TO 'marvin'@'%';;
+
+
+-- FLUSH PRIVILEGES
+FLUSH PRIVILEGES;

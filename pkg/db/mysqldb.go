@@ -19,9 +19,6 @@ import (
 	"database/sql"
 	"fmt"
 
-	"github.com/WentaoJin/tidba/zlog"
-	"go.uber.org/zap"
-
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -84,59 +81,4 @@ WHERE
 		tables = append(tables, r["table_name"])
 	}
 	return tables, nil
-}
-
-func IsExistSchemaWithInMysql(mysql *Engine, schemaName string) bool {
-	querySQL := fmt.Sprintf(`SELECT count(schema_name) AS SCHEMA_NAME
-FROM information_schema.SCHEMATA
-WHERE schema_name = '%s'`, schemaName)
-	_, res, _ := mysql.QuerySQL(querySQL)
-	if res[0]["SCHEMA_NAME"] == "0" {
-		return false
-	}
-	return true
-}
-
-func IsExistIndexWithInMysql(mysql *Engine, schemaName, tableName, indexName string) bool {
-	querySQL := fmt.Sprintf(`SELECT count(1) AS CT
-FROM information_schema.statistics 
-WHERE table_schema='%s' 
-AND table_name = '%s' 
-AND index_name = '%s'`, schemaName, tableName, indexName)
-	_, res, _ := mysql.QuerySQL(querySQL)
-	if res[0]["CT"] == "0" {
-		return false
-	}
-	return true
-}
-
-func IsExistViewWithInMysql(mysql *Engine, schemaName, viewName string) bool {
-	querySQL := fmt.Sprintf(`SELECT count(TABLE_NAME) AS TABLE_NAME
-FROM information_schema.VIEWS
-WHERE table_schema='%s' 
-and table_name ='%s'`, schemaName, viewName)
-	_, res, _ := mysql.QuerySQL(querySQL)
-	if res[0]["TABLE_NAME"] == "0" {
-		return false
-	}
-	return true
-}
-
-func RenameTableWithInMysql(mysql *Engine, schemaName, tableName string) {
-	backupTable := fmt.Sprintf("%s_bak", tableName)
-	querySQL := fmt.Sprintf("RENAME TABLE `%s`.`%s` TO `%s`.`%s`", schemaName, tableName, schemaName, backupTable)
-	zlog.Logger.Info("Exec sql", zap.String("msg", fmt.Sprintf("Start rename create view %s.%s at the mysql db, Table SQL: %v", schemaName, tableName, querySQL)))
-	mysql.QuerySQL(querySQL)
-}
-
-func IsExistTableWithInMysql(mysql *Engine, schemaName, tableName string) bool {
-	querySQL := fmt.Sprintf(`SELECT count(TABLE_NAME) AS TABLE_NAME
-FROM information_schema.TABLES 
-WHERE table_schema='%s' 
-and table_name ='%s'`, schemaName, tableName)
-	_, res, _ := mysql.QuerySQL(querySQL)
-	if res[0]["TABLE_NAME"] == "0" {
-		return false
-	}
-	return true
 }

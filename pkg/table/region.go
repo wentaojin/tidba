@@ -36,7 +36,7 @@ func IncludeTableRegionDataView(dbName string, concurrency int, includeTables []
 		return err
 	}
 
-	isSubset, notExistTables := util.IsExistIncludeTable(allTables, includeTables)
+	isSubset, notExistTables := util.IsExistInclude(allTables, includeTables)
 	if !isSubset {
 		return fmt.Errorf("db %s table '%v' not exist", dbName, notExistTables)
 	}
@@ -104,7 +104,7 @@ func FilterTableRegionDataView(dbName string, concurrency int, excludeTables []s
 		return err
 	}
 
-	includeTables := util.FilterFromAllTables(allTables, excludeTables)
+	includeTables := util.FilterFromAll(allTables, excludeTables)
 
 	wg := sync.WaitGroup{}
 	jobsChannel := make(chan string, len(includeTables))
@@ -169,7 +169,7 @@ func RegexpTableRegionDataView(dbName string, concurrency int, regex string, eng
 		return err
 	}
 
-	includeTables := util.RegexpFromAllTables(allTables, regex)
+	includeTables := util.RegexpFromAll(allTables, regex)
 	wg := sync.WaitGroup{}
 	jobsChannel := make(chan string, len(includeTables))
 
@@ -301,7 +301,7 @@ func IncludeTableRegionIndexView(dbName string, concurrency int, includeTables [
 		return err
 	}
 
-	isSubset, notExistTables := util.IsExistIncludeTable(allTables, includeTables)
+	isSubset, notExistTables := util.IsExistInclude(allTables, includeTables)
 	if !isSubset {
 		return fmt.Errorf("db %s table '%v' not exist", dbName, notExistTables)
 	}
@@ -385,7 +385,7 @@ func FilterTableRegionIndexView(dbName string, concurrency int, excludeTables, i
 		return err
 	}
 
-	includeTables := util.FilterFromAllTables(allTables, excludeTables)
+	includeTables := util.FilterFromAll(allTables, excludeTables)
 	wg := sync.WaitGroup{}
 	jobsChannel := make(chan string, len(includeTables))
 
@@ -459,7 +459,7 @@ func RegexpTableRegionIndexView(dbName string, concurrency int, regex string, in
 		return err
 	}
 
-	includeTables := util.RegexpFromAllTables(allTables, regex)
+	includeTables := util.RegexpFromAll(allTables, regex)
 	wg := sync.WaitGroup{}
 	jobsChannel := make(chan string, len(includeTables))
 

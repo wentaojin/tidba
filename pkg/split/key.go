@@ -40,7 +40,7 @@ func IncludeTableSplitKey(dbName string, statusAddr string, concurrency int, inc
 	if err != nil {
 		return err
 	}
-	isSubset, notExistTables := util.IsExistIncludeTable(allTables, includeTables)
+	isSubset, notExistTables := util.IsExistInclude(allTables, includeTables)
 	if !isSubset {
 		return fmt.Errorf("db [%s] table '%v' not exist", dbName, notExistTables)
 	}
@@ -73,7 +73,7 @@ func FilterTableSplitKey(dbName string, statusAddr string, concurrency int, excl
 		return err
 	}
 
-	includeTables := util.FilterFromAllTables(allTables, excludeTables)
+	includeTables := util.FilterFromAll(allTables, excludeTables)
 
 	loc, err := getSessionLocation(engine)
 	if err != nil {
@@ -103,7 +103,7 @@ func RegexpTableSplitKey(dbName string, statusAddr string, concurrency int, rege
 	if err != nil {
 		return err
 	}
-	includeTables := util.RegexpFromAllTables(allTables, regex)
+	includeTables := util.RegexpFromAll(allTables, regex)
 
 	loc, err := getSessionLocation(engine)
 	if err != nil {

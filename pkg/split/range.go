@@ -41,7 +41,7 @@ func IncludeTableSplitRange(dbName string, concurrency int, includeTables []stri
 	if err != nil {
 		return err
 	}
-	isSubset, notExistTables := util.IsExistIncludeTable(allTables, includeTables)
+	isSubset, notExistTables := util.IsExistInclude(allTables, includeTables)
 	if !isSubset {
 		return fmt.Errorf("db [%s] table '%v' not exist", dbName, notExistTables)
 	}
@@ -67,7 +67,7 @@ func FilterTableSplitRange(dbName string, concurrency int, excludeTables []strin
 		return err
 	}
 
-	includeTables := util.FilterFromAllTables(allTables, excludeTables)
+	includeTables := util.FilterFromAll(allTables, excludeTables)
 
 	var tasks []*Task
 	for i, table := range includeTables {
@@ -91,7 +91,7 @@ func RegexpTableSplitRange(dbName string, concurrency int, regex string, outDir 
 	if err != nil {
 		return err
 	}
-	includeTables := util.RegexpFromAllTables(allTables, regex)
+	includeTables := util.RegexpFromAll(allTables, regex)
 
 	var tasks []*Task
 	for i, table := range includeTables {

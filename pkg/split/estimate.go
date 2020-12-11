@@ -47,7 +47,7 @@ func IncludeTableSplitEstimate(engine *db.Engine, dbName string, tableName strin
 		return err
 	}
 
-	isSubset, notExistTables := util.IsExistIncludeTable(allTables, includeTables)
+	isSubset, notExistTables := util.IsExistInclude(allTables, includeTables)
 	if !isSubset {
 		return fmt.Errorf("db [%s] table '%v' not exist", dbName, notExistTables)
 	}

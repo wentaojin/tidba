@@ -16,10 +16,7 @@ limitations under the License.
 package util
 
 import (
-	"fmt"
-	"io/ioutil"
 	"os"
-	"reflect"
 	"regexp"
 	"sort"
 	"strings"
@@ -28,8 +25,8 @@ import (
 	"github.com/scylladb/go-set/strset"
 )
 
-// IsExistIncludeTable checks includeTables is whether exist
-func IsExistIncludeTable(allTables, includeTables []string) (bool, []string) {
+// IsExistInclude checks include is whether exist
+func IsExistInclude(allTables, includeTables []string) (bool, []string) {
 	s1 := set.NewStringSet()
 	for _, t := range allTables {
 		s1.Add(strings.ToLower(t))
@@ -39,15 +36,15 @@ func IsExistIncludeTable(allTables, includeTables []string) (bool, []string) {
 		s2.Add(strings.ToLower(t))
 	}
 	isSubset := s1.IsSubset(s2)
-	var notExistTables []string
+	var notExists []string
 	if !isSubset {
-		notExistTables = strset.Difference(s2, s1).List()
+		notExists = strset.Difference(s2, s1).List()
 	}
-	return isSubset, notExistTables
+	return isSubset, notExists
 }
 
-// FilterFromAllTables filters table from all tables
-func FilterFromAllTables(allTables, excludeTables []string) []string {
+// FilterFromAll filters  from all
+func FilterFromAll(allTables, excludeTables []string) []string {
 	// exclude table from all tables
 	s1 := set.NewStringSet()
 	for _, t := range allTables {
@@ -60,16 +57,16 @@ func FilterFromAllTables(allTables, excludeTables []string) []string {
 	return strset.Difference(s1, s2).List()
 }
 
-// RegexpFromAllTables regexp table from all tables
-func RegexpFromAllTables(allTables []string, regex string) []string {
-	var regexTables []string
+// RegexpFromAll regexp table from all
+func RegexpFromAll(allTables []string, regex string) []string {
+	var regexps []string
 	rep := regexp.MustCompile(regex)
 	for _, v := range allTables {
 		if rep.MatchString(v) {
-			regexTables = append(regexTables, v)
+			regexps = append(regexps, v)
 		}
 	}
-	return regexTables
+	return regexps
 }
 
 // IsExistPath checks path is whether exist
@@ -82,62 +79,6 @@ func IsExistPath(path string) (bool, error) {
 		return false, nil
 	}
 	return false, err
-}
-
-// find two slice repeat elem
-func FindStringSliceRepeatElem(slice1, slice2 []string) []string {
-	var u []string
-	for _, v := range slice1 {
-		if stringsContains(slice2, v) {
-			u = append(u, v)
-		}
-	}
-	return u
-}
-
-func stringsContains(array []string, val string) bool {
-	for i := 0; i < len(array); i++ {
-		if array[i] == val {
-			return true
-		}
-	}
-	return false
-}
-
-// find two slice different elem
-func FindStringSlicesDiffElem(slice1 []string, slice2 []string) []string {
-	var diffStr []string
-	m := map[string]int{}
-	for _, s1Val := range slice1 {
-		m[s1Val] = 1
-	}
-	for _, s2Val := range slice2 {
-		m[s2Val] = m[s2Val] + 1
-	}
-	for mKey, mVal := range m {
-		if mVal == 1 {
-			diffStr = append(diffStr, mKey)
-		}
-	}
-	return diffStr
-}
-
-// determine if an element is in a slice, array, map, if true, exist
-func Contain(obj interface{}, target interface{}) bool {
-	targetValue := reflect.ValueOf(target)
-	switch reflect.TypeOf(target).Kind() {
-	case reflect.Slice, reflect.Array:
-		for i := 0; i < targetValue.Len(); i++ {
-			if targetValue.Index(i).Interface() == obj {
-				return true
-			}
-		}
-	case reflect.Map:
-		if targetValue.MapIndex(reflect.ValueOf(obj)).IsValid() {
-			return true
-		}
-	}
-	return false
 }
 
 // Paginate split slice by paginate
@@ -174,30 +115,4 @@ func Int(slice []int) []int {
 	}
 	sort.Ints(result)
 	return result
-}
-
-// UniqueStrings returns unique string values in a slice
-func UniqueStrings(slice []string) []string {
-	uMap := make(map[string]struct{})
-	result := []string{}
-	for _, val := range slice {
-		uMap[val] = struct{}{}
-	}
-	for key := range uMap {
-		result = append(result, key)
-	}
-	return result
-}
-
-// GetFileNameFromDir get all file name from dir
-func GetFileNameByRegexp(path, rep string) []string {
-	files, _ := ioutil.ReadDir(path)
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		} else {
-			fmt.Println(file.Name())
-		}
-	}
-	return nil
 }
