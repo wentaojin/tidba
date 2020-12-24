@@ -17,10 +17,17 @@ package main
 
 import (
 	"fmt"
-	"strconv"
 )
 
 func main() {
-	int1, _ := strconv.Atoi("0")
-	fmt.Println(int1)
+	a := []int{0, 0, 1, 2, 3, 3, 2, 4, 1, 3, 0, 2}
+	num := make(map[int]bool)
+	for i, v := range a[1:] {
+		if !num[v] {
+			num[v] = true
+		} else {
+			fmt.Printf("value: %v, index: %v\n", v, i+1)
+		}
+	}
+	fmt.Println(a[10])
 }

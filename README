@@ -10,6 +10,7 @@ TiDB 数据库 DBA 常用工具集，功能：
   - v4.0 以下 tikv 需要单独从 tikv 日志中获取配置文件 --base-tikv-json 用于对比
   - v4.0 及以上可不需要，直接对比 --base-tikv-addr 、--new-tikv-addr 
 - 导出用户创建以及授权信息
+- SQL语句批量执行
 - Oracle 自动迁移 Schema 至 Mysql
   - 考虑 oracle 特有依赖, migrate 单独 repo: https://github.com/WentaoJin/transferdb
 
@@ -84,6 +85,13 @@ exporter
 ```
 -- 导出用户创建以及授权 SQL
 $./tidba exporter user --help
+```
+
+sql
+
+```
+-- 批量执行 SQL 
+$./tidba sql --help
 ```
 
 migrate - 考虑 oracle 特有依赖, migrate 单独 repo 
