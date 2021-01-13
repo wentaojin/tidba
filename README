@@ -1,6 +1,6 @@
 # TiDBA
 
-TiDB 数据库 DBA 常用工具集，功能：
+TiDB 数据库 DBA 常用工具集，已包含功能（欢迎大家使用以及提建议）：
 
 - 固定间隔，并发收集统计信息
 - 查看表数据 region leader 以及索引 region leader 分布

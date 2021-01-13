@@ -18,12 +18,7 @@ package diff
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"os"
 	"strings"
-
-	"github.com/logrusorgru/aurora"
-	"github.com/mattn/go-colorable"
 
 	"github.com/WentaoJin/tidba/pkg/db"
 )
@@ -65,79 +60,29 @@ FROM
 	information_schema.SESSION_VARIABLES  
 WHERE
 	VARIABLE_NAME = 'tidb_config'`
-	n
 	tidbVariable = "variable"
 	tidbConfig   = "config"
 )
 
-func ComponentTiDBDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newPassword string, diffType, outFile string) error {
-	if err := getClusterJsonDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newPassword, diffType, outFile); err != nil {
+func ComponentTiDBDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newPassword, diffType, format string, coloring, quiet bool) error {
+	if err := getClusterJsonDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newPassword, diffType, format, coloring, quiet); err != nil {
 		return nil
 	}
 	return nil
 }
 
-func getClusterJsonDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newPassword string, diffType, outFile string) error {
+func getClusterJsonDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newPassword, diffType, format string, coloring, quiet bool) error {
 	baseJsonByte, err := getClusterJson(baseAddr, baseUser, basePassword, diffType)
 	if err != nil {
 		return err
 	}
-
 	newJsonByte, err := getClusterJson(newAddr, newUser, newPassword, diffType)
 	if err != nil {
 		return err
 	}
 
-	var (
-		opts   []Option
-		w      io.Writer
-		stdout io.Writer
-		au     aurora.Aurora
-	)
-	if outFile == "-" {
-		// init stout color
-		// open aurora color ANSI output
-		stdout = colorable.NewColorable(os.Stdout)
-		au = aurora.NewAurora(true)
-		w = stdout
-	} else {
-		// close aurora color ANSI output
-		au = aurora.NewAurora(false)
-		file, err := os.Create(outFile)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		w = file
-	}
-
-	jsonFmtFn := NewJSONFormatFunc(true)
-	hunks, err := Diff(baseJsonByte, newJsonByte, opts...)
-	if err != nil {
-		return fmt.Errorf("Error: diff failed: %s\n", err)
-	}
-
-	if len(hunks) == 0 {
-		// Indicates the same json value on both sides
-		// return nil
-		return Equivalent
-	}
-
-	if _, err := fmt.Fprintf(w, "--- %v\n", au.Green(baseAddr)); err != nil {
+	if err := JSONDiff(baseJsonByte, newJsonByte, baseAddr, newAddr, format, coloring, quiet); err != nil {
 		return err
-	}
-	if _, err := fmt.Fprintf(w, "+++ %v\n", au.Red(newAddr)); err != nil {
-		return err
-	}
-	for i, hunk := range hunks {
-		if i > 0 {
-			if _, err := fmt.Fprintln(w); err != nil {
-				return err
-			}
-		}
-		if err := WriteHunk(w, au, hunk, jsonFmtFn); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -160,7 +105,7 @@ func getClusterJson(addr, user, password string, diffType string) ([]byte, error
 		}
 		return bd, nil
 
-	} else {
+	} else if diffType == tidbConfig {
 		baseData, err := getQueryConfigResultBySQL(baseEngine)
 		if err != nil {
 			return nil, err
@@ -171,6 +116,8 @@ func getClusterJson(addr, user, password string, diffType string) ([]byte, error
 			return bd, fmt.Errorf("newAddr [%s] json.Marshal failed: %v", addr, err)
 		}
 		return bd, nil
+	} else {
+		return []byte(""), fmt.Errorf("unknow diff type %s: not support", diffType)
 	}
 }
 

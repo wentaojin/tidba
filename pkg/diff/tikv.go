@@ -17,23 +17,14 @@ package diff
 
 import (
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
-
-	"github.com/logrusorgru/aurora"
-	"github.com/mattn/go-colorable"
 )
 
-func ComponentTiKVDiffByAPI(baseTiKVAddr, newTiKVAddr, outFile string) error {
+func ComponentTiKVDiffByAPI(baseTiKVAddr, newTiKVAddr, format string, coloring, quiet bool) error {
 	var (
 		baseTiKVJson, newTiKVJson string
 		err                       error
-		opts                      []Option
-		w                         io.Writer
-		stdout                    io.Writer
-		au                        aurora.Aurora
 	)
 	if baseTiKVJson, err = getTiKVConfigByAPI(baseTiKVAddr); err != nil {
 		return err
@@ -42,63 +33,17 @@ func ComponentTiKVDiffByAPI(baseTiKVAddr, newTiKVAddr, outFile string) error {
 		return err
 	}
 
-	if outFile == "-" {
-		// init stout color
-		// open aurora color ANSI output
-		stdout = colorable.NewColorable(os.Stdout)
-		au = aurora.NewAurora(true)
-		w = stdout
-	} else {
-		// close aurora color ANSI output
-		au = aurora.NewAurora(false)
-		file, err := os.Create(outFile)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		w = file
-	}
-
-	jsonFmtFn := NewJSONFormatFunc(true)
-	hunks, err := Diff([]byte(baseTiKVJson), []byte(newTiKVJson), opts...)
-	if err != nil {
-		return fmt.Errorf("Error: diff by api failed: %s\n", err)
-	}
-
-	if len(hunks) == 0 {
-		// Indicates the same json value on both sides
-		// return nil
-		return Equivalent
-	}
-
-	if _, err := fmt.Fprintf(w, "--- %v\n", au.Green(baseTiKVAddr)); err != nil {
+	if err := JSONDiff([]byte(baseTiKVJson), []byte(newTiKVJson), baseTiKVAddr, newTiKVAddr, format, coloring, quiet); err != nil {
 		return err
-	}
-	if _, err := fmt.Fprintf(w, "+++ %v\n", au.Red(newTiKVAddr)); err != nil {
-		return err
-	}
-	for i, hunk := range hunks {
-		if i > 0 {
-			if _, err := fmt.Fprintln(w); err != nil {
-				return err
-			}
-		}
-		if err := WriteHunk(w, au, hunk, jsonFmtFn); err != nil {
-			return err
-		}
 	}
 	return nil
 }
 
-func ComponentTiKVDiffByJSON(baseTiKVJson, newTiKVAddr, outFile string) error {
+func ComponentTiKVDiffByJSON(baseTiKVJson, newTiKVAddr, format string, coloring, quiet bool) error {
 	var (
 		baseTiKVJSON          []byte
 		newTiKVJson, fileName string
 		err                   error
-		opts                  []Option
-		w                     io.Writer
-		stdout                io.Writer
-		au                    aurora.Aurora
 	)
 	if baseTiKVJSON, fileName, err = ReadJSONFile(baseTiKVJson); err != nil {
 		return err
@@ -106,51 +51,8 @@ func ComponentTiKVDiffByJSON(baseTiKVJson, newTiKVAddr, outFile string) error {
 	if newTiKVJson, err = getTiKVConfigByAPI(newTiKVAddr); err != nil {
 		return err
 	}
-
-	if outFile == "-" {
-		// init stout color
-		// open aurora color ANSI output
-		stdout = colorable.NewColorable(os.Stdout)
-		au = aurora.NewAurora(true)
-		w = stdout
-	} else {
-		// close aurora color ANSI output
-		au = aurora.NewAurora(false)
-		file, err := os.Create(outFile)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		w = file
-	}
-
-	jsonFmtFn := NewJSONFormatFunc(true)
-	hunks, err := Diff(baseTiKVJSON, []byte(newTiKVJson), opts...)
-	if err != nil {
-		return fmt.Errorf("Error: diff by json failed: %s\n", err)
-	}
-
-	if len(hunks) == 0 {
-		// Indicates the same json value on both sides
-		// return nil
-		return Equivalent
-	}
-
-	if _, err := fmt.Fprintf(w, "--- %v\n", au.Green(fileName)); err != nil {
+	if err := JSONDiff(baseTiKVJSON, []byte(newTiKVJson), fileName, newTiKVAddr, format, coloring, quiet); err != nil {
 		return err
-	}
-	if _, err := fmt.Fprintf(w, "+++ %v\n", au.Red(newTiKVAddr)); err != nil {
-		return err
-	}
-	for i, hunk := range hunks {
-		if i > 0 {
-			if _, err := fmt.Fprintln(w); err != nil {
-				return err
-			}
-		}
-		if err := WriteHunk(w, au, hunk, jsonFmtFn); err != nil {
-			return err
-		}
 	}
 	return nil
 }

@@ -60,7 +60,9 @@ type AppDiffPD struct {
 	*AppDiff   // embedded parent command storage
 	basePDAddr string
 	newPDAddr  string
-	outFile    string
+	format     string
+	coloring   bool
+	quiet      bool
 }
 
 func (app *AppDiff) AppDiffPD() Cmder {
@@ -77,8 +79,9 @@ func (app *AppDiffPD) Cmd() *cobra.Command {
 	}
 	cmd.Flags().StringVar(&app.basePDAddr, "base-pd-addr", "", "configure cluster base pd addr, for example: pd-ip:status-port")
 	cmd.Flags().StringVar(&app.newPDAddr, "new-pd-addr", "", "configure cluster new pd addr, for example: pd-ip:status-port")
-	cmd.Flags().StringVar(&app.outFile, "out-file", "-", "configure output file name")
-
+	cmd.Flags().StringVar(&app.format, "format", "ascii", "configure diff output format (ascii, delta)")
+	cmd.Flags().BoolVar(&app.coloring, "coloring", false, "enable coloring in the ASCII mode (not available in the delta mode)")
+	cmd.Flags().BoolVar(&app.quiet, "quiet", false, "Quiet output, if no differences are found")
 	return cmd
 }
 
@@ -91,7 +94,7 @@ func (app *AppDiffPD) RunE(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(msg, "new-pd-addr")
 	}
 
-	err := diff.ComponentPDDiff(app.basePDAddr, app.newPDAddr, app.outFile)
+	err := diff.ComponentPDDiff(app.basePDAddr, app.newPDAddr, app.format, app.coloring, app.quiet)
 	if err != nil && err == diff.Equivalent {
 		zlog.Logger.Info("Task run success", zap.String("equivalent",
 			fmt.Sprintf(`the pd components on both sides of [%s] and [%s] have the same configuration,so you can skip the check`, app.basePDAddr, app.newPDAddr)))
@@ -113,7 +116,9 @@ type AppDiffTiDB struct {
 	newTiDBUser      string
 	newTiDBPassword  string
 	diffType         string
-	outFile          string
+	format           string
+	coloring         bool
+	quiet            bool
 }
 
 func (app *AppDiff) AppDiffTiDB() Cmder {
@@ -135,8 +140,9 @@ func (app *AppDiffTiDB) Cmd() *cobra.Command {
 	cmd.Flags().StringVar(&app.newTiDBUser, "new-tidb-user", "", "configure cluster new tidb db user")
 	cmd.Flags().StringVar(&app.newTiDBPassword, "new-tidb-pass", "", "configure cluster new tidb db user password")
 	cmd.Flags().StringVar(&app.diffType, "diff-type", "variable", "configure tidb diff type; can be 'variable' (default if omitted), or 'config'")
-	cmd.Flags().StringVar(&app.outFile, "out-file", "-", "configure output file name")
-
+	cmd.Flags().StringVar(&app.format, "format", "ascii", "configure diff output format (ascii, delta)")
+	cmd.Flags().BoolVar(&app.coloring, "coloring", false, "enable coloring in the ASCII mode (not available in the delta mode)")
+	cmd.Flags().BoolVar(&app.quiet, "quiet", false, "Quiet output, if no differences are found")
 	return cmd
 }
 
@@ -145,7 +151,7 @@ func (app *AppDiffTiDB) RunE(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	err := diff.ComponentTiDBDiff(app.baseTiDBAddr, app.baseTiDBUser, app.baseTiDBPassword, app.newTiDBAddr,
-		app.newTiDBUser, app.newTiDBPassword, app.diffType, app.outFile)
+		app.newTiDBUser, app.newTiDBPassword, app.diffType, app.format, app.coloring, app.quiet)
 	if err != nil && err == diff.Equivalent {
 		zlog.Logger.Info("Task run success", zap.String("equivalent",
 			fmt.Sprintf(`the tidb components on both sides of [%s] and [%s] have the same configuration,so you can skip the check`, app.baseTiDBAddr, app.newTiDBAddr)))
@@ -180,7 +186,9 @@ type AppDiffTiKV struct {
 	baseTiKVAddr     string
 	baseTiKVJsonFile string
 	newTiKVAddr      string
-	outFile          string
+	format           string
+	coloring         bool
+	quiet            bool
 }
 
 func (app *AppDiff) AppDiffTiKV() Cmder {
@@ -198,7 +206,9 @@ func (app *AppDiffTiKV) Cmd() *cobra.Command {
 	cmd.Flags().StringVar(&app.baseTiKVAddr, "base-tikv-addr", "", "configure cluster base tikv addr, general used to be higher v4.0 cluster,for example: tikv-ip:status-port")
 	cmd.Flags().StringVar(&app.baseTiKVJsonFile, "base-tikv-json", "", "configure cluster base tikv json, general used to be lower v4.0 cluster,for example: v3.0.5.json")
 	cmd.Flags().StringVar(&app.newTiKVAddr, "new-tikv-addr", "", "configure cluster new tikv addr, general used to be higher v4.0 cluster,for example: tikv-ip:status-port")
-	cmd.Flags().StringVar(&app.outFile, "out-file", "-", "configure output file name")
+	cmd.Flags().StringVar(&app.format, "format", "ascii", "configure diff output format (ascii, delta)")
+	cmd.Flags().BoolVar(&app.coloring, "coloring", false, "enable coloring in the ASCII mode (not available in the delta mode)")
+	cmd.Flags().BoolVar(&app.quiet, "quiet", false, "Quiet output, if no differences are found")
 
 	return cmd
 }
@@ -206,7 +216,7 @@ func (app *AppDiffTiKV) Cmd() *cobra.Command {
 func (app *AppDiffTiKV) RunE(cmd *cobra.Command, args []string) error {
 	switch {
 	case app.baseTiKVAddr != "" && app.newTiKVAddr != "":
-		err := diff.ComponentTiKVDiffByAPI(app.baseTiKVAddr, app.newTiKVAddr, app.outFile)
+		err := diff.ComponentTiKVDiffByAPI(app.baseTiKVAddr, app.newTiKVAddr, app.format, app.coloring, app.quiet)
 		if err != nil && err == diff.Equivalent {
 			zlog.Logger.Info("Task run success", zap.String("equivalent",
 				fmt.Sprintf(`the tikv components on both sides of [%s] and [%s] have the same configuration,so you can skip the check`, app.baseTiKVAddr, app.newTiKVAddr)))
@@ -214,7 +224,7 @@ func (app *AppDiffTiKV) RunE(cmd *cobra.Command, args []string) error {
 			return err
 		}
 	case app.baseTiKVJsonFile != "" && app.newTiKVAddr != "":
-		err := diff.ComponentTiKVDiffByJSON(app.baseTiKVJsonFile, app.newTiKVAddr, app.outFile)
+		err := diff.ComponentTiKVDiffByJSON(app.baseTiKVJsonFile, app.newTiKVAddr, app.format, app.coloring, app.quiet)
 		if err != nil && err == diff.Equivalent {
 			zlog.Logger.Info("Task run success", zap.String("equivalent",
 				fmt.Sprintf(`the tikv components on both sides of [%s] and [%s] have the same configuration,so you can skip the check`, app.baseTiKVJsonFile, app.newTiKVAddr)))

@@ -16,28 +16,15 @@ limitations under the License.
 package diff
 
 import (
-	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
-
-	"github.com/logrusorgru/aurora"
-	"github.com/mattn/go-colorable"
 )
 
-// Indicates the same json value on both sides
-var Equivalent = errors.New("equivalent")
-
-func ComponentPDDiff(basePDAddr, newPDAddr, outFile string) error {
+func ComponentPDDiff(basePDAddr, newPDAddr, format string, coloring, quiet bool) error {
 	var (
 		basePDJson, newPDJson string
 		err                   error
-		opts                  []Option
-		w                     io.Writer
-		stdout                io.Writer
-		au                    aurora.Aurora
 	)
 	if basePDJson, err = getPDConfigByAPI(basePDAddr); err != nil {
 		return err
@@ -45,53 +32,9 @@ func ComponentPDDiff(basePDAddr, newPDAddr, outFile string) error {
 	if newPDJson, err = getPDConfigByAPI(newPDAddr); err != nil {
 		return err
 	}
-
-	if outFile == "-" {
-		// init stout color
-		// open aurora color ANSI output
-		stdout = colorable.NewColorable(os.Stdout)
-		au = aurora.NewAurora(true)
-		w = stdout
-	} else {
-		// close aurora color ANSI output
-		au = aurora.NewAurora(false)
-		file, err := os.Create(outFile)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-		w = file
-	}
-
-	jsonFmtFn := NewJSONFormatFunc(true)
-	hunks, err := Diff([]byte(basePDJson), []byte(newPDJson), opts...)
-	if err != nil {
-		return fmt.Errorf("Error: diff failed: %s\n", err)
-	}
-
-	if len(hunks) == 0 {
-		// Indicates the same json value on both sides
-		// return nil
-		return Equivalent
-	}
-
-	if _, err := fmt.Fprintf(w, "--- %v\n", au.Green(basePDAddr)); err != nil {
+	if err := JSONDiff([]byte(basePDJson), []byte(newPDJson), basePDAddr, newPDAddr, format, coloring, quiet); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "+++ %v\n", au.Red(newPDAddr)); err != nil {
-		return err
-	}
-	for i, hunk := range hunks {
-		if i > 0 {
-			if _, err := fmt.Fprintln(w); err != nil {
-				return err
-			}
-		}
-		if err := WriteHunk(w, au, hunk, jsonFmtFn); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
