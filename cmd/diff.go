@@ -203,6 +203,7 @@ func (app *AppDiffTiKV) Cmd() *cobra.Command {
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
+
 	cmd.Flags().StringVar(&app.baseTiKVAddr, "base-tikv-addr", "", "configure cluster base tikv addr, general used to be higher v4.0 cluster,for example: tikv-ip:status-port")
 	cmd.Flags().StringVar(&app.baseTiKVJsonFile, "base-tikv-json", "", "configure cluster base tikv json, general used to be lower v4.0 cluster,for example: v3.0.5.json")
 	cmd.Flags().StringVar(&app.newTiKVAddr, "new-tikv-addr", "", "configure cluster new tikv addr, general used to be higher v4.0 cluster,for example: tikv-ip:status-port")
