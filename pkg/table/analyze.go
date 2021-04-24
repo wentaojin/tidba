@@ -18,9 +18,9 @@ package table
 import (
 	"fmt"
 
-	"github.com/WentaoJin/tidba/pkg/util"
+	"github.com/wentaojin/tidba/pkg/util"
 
-	"github.com/WentaoJin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/db"
 )
 
 func IncludeTableAnalyze(dbName string, concurrency int, includeTables []string, engine *db.Engine) error {

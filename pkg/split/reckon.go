@@ -25,8 +25,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/WentaoJin/tidba/pkg/db"
-	"github.com/WentaoJin/tidba/zlog"
+	"github.com/wentaojin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/zlog"
 	"go.uber.org/zap"
 )
 

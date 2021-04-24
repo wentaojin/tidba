@@ -21,8 +21,8 @@ import (
 	_ "net/http/pprof"
 	"os"
 
-	"github.com/WentaoJin/tidba/cmd"
-	"github.com/WentaoJin/tidba/zlog"
+	"github.com/wentaojin/tidba/cmd"
+	"github.com/wentaojin/tidba/zlog"
 )
 
 func init() {

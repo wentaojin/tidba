@@ -19,10 +19,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/WentaoJin/tidba/pkg/table"
+	"github.com/wentaojin/tidba/pkg/table"
 
-	"github.com/WentaoJin/tidba/pkg/db"
 	"github.com/spf13/cobra"
+	"github.com/wentaojin/tidba/pkg/db"
 )
 
 // AppTable is storage for the sub command analyze

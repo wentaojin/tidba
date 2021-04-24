@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/WentaoJin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/db"
 )
 
 const (

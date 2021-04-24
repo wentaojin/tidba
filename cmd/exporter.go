@@ -16,9 +16,9 @@ limitations under the License.
 package cmd
 
 import (
-	"github.com/WentaoJin/tidba/pkg/db"
-	"github.com/WentaoJin/tidba/pkg/exporter"
 	"github.com/spf13/cobra"
+	"github.com/wentaojin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/exporter"
 )
 
 // AppExporter

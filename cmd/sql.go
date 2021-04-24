@@ -18,10 +18,10 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/WentaoJin/tidba/pkg/sql"
+	"github.com/wentaojin/tidba/pkg/sql"
 
-	"github.com/WentaoJin/tidba/pkg/db"
 	"github.com/spf13/cobra"
+	"github.com/wentaojin/tidba/pkg/db"
 )
 
 // AppSQL is storage for the sub command analyze

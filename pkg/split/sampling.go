@@ -28,10 +28,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/WentaoJin/tidba/zlog"
+	"github.com/wentaojin/tidba/zlog"
 	"go.uber.org/zap"
 
-	"github.com/WentaoJin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/db"
 )
 
 func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, newDB, newTable, newIndex, outDir string, totalWriteRows int) error {

@@ -36,7 +36,7 @@ import (
 	"github.com/pingcap/tidb/tablecodec"
 	"github.com/pingcap/tidb/types"
 
-	"github.com/WentaoJin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/db"
 )
 
 func decodeKeyFromString(s, statusAddr string, loc *time.Location) (string, error) {

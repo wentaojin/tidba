@@ -23,7 +23,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/WentaoJin/tidba/pkg/mok"
+	"github.com/wentaojin/tidba/pkg/mok"
 
 	"github.com/pingcap/tidb/util/codec"
 	"github.com/spf13/cobra"

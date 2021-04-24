@@ -18,10 +18,10 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/WentaoJin/tidba/zlog"
+	"github.com/wentaojin/tidba/zlog"
 	"go.uber.org/zap"
 
-	"github.com/WentaoJin/tidba/pkg/diff"
+	"github.com/wentaojin/tidba/pkg/diff"
 
 	"github.com/spf13/cobra"
 )

@@ -20,11 +20,11 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/WentaoJin/tidba/pkg/util"
-	"github.com/WentaoJin/tidba/zlog"
+	"github.com/wentaojin/tidba/pkg/util"
+	"github.com/wentaojin/tidba/zlog"
 	"go.uber.org/zap"
 
-	"github.com/WentaoJin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/db"
 )
 
 /*

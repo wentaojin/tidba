@@ -21,9 +21,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/WentaoJin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/db"
 
-	"github.com/WentaoJin/tidba/pkg/util"
+	"github.com/wentaojin/tidba/pkg/util"
 )
 
 // Split table info

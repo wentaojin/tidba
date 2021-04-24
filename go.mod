@@ -1,4 +1,4 @@
-module github.com/WentaoJin/tidba
+module github.com/wentaojin/tidba
 
 go 1.15
 

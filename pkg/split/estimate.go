@@ -28,11 +28,11 @@ import (
 
 	"github.com/twotwotwo/sorts/sortutil"
 
-	"github.com/WentaoJin/tidba/zlog"
+	"github.com/wentaojin/tidba/zlog"
 	"go.uber.org/zap"
 
-	"github.com/WentaoJin/tidba/pkg/db"
-	"github.com/WentaoJin/tidba/pkg/util"
+	"github.com/wentaojin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/util"
 )
 
 func IncludeTableSplitEstimate(engine *db.Engine, dbName string, tableName string, columnName string, newDbName, newTableName, indexName string,

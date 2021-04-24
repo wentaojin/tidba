@@ -24,9 +24,9 @@ import (
 	"path"
 	"strings"
 
-	"github.com/WentaoJin/tidba/pkg/util"
+	"github.com/wentaojin/tidba/pkg/util"
 
-	"github.com/WentaoJin/tidba/pkg/db"
+	"github.com/wentaojin/tidba/pkg/db"
 )
 
 type sqlRun struct {
