@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,9 +27,14 @@ import (
 // AppSQL is storage for the sub command analyze
 type AppSQL struct {
 	*App         // embedded parent command storage
-	SQLFile      string
-	SQLSeparator string
-	OutDir       string
+	host         string
+	port         int
+	user         string
+	password     string
+	dbName       string
+	sqlFile      string
+	sqlSeparator string
+	outDir       string
 }
 
 func (app *App) AppSQL() Cmder {
@@ -44,19 +49,24 @@ func (app *AppSQL) Cmd() *cobra.Command {
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
-	cmd.Flags().StringVar(&app.SQLFile, "sql-file", "", "configure sql file")
-	cmd.Flags().StringVar(&app.SQLSeparator, "sql-separator", ";", "configure sql separator in th sql file")
-	cmd.Flags().StringVar(&app.OutDir, "out-dir", "/tmp/sql/", "configure sql output dir")
+	cmd.PersistentFlags().StringVarP(&app.host, "host", "", "127.0.0.1", "database host ip")
+	cmd.PersistentFlags().IntVarP(&app.port, "port", "P", 4000, "database service port")
+	cmd.PersistentFlags().StringVarP(&app.user, "user", "u", "root", "database user name")
+	cmd.PersistentFlags().StringVarP(&app.password, "password", "p", "", "database user password")
+	cmd.PersistentFlags().StringVarP(&app.dbName, "db", "D", "", "database name")
+	cmd.Flags().StringVar(&app.sqlFile, "sql-file", "", "configure sql file")
+	cmd.Flags().StringVar(&app.sqlSeparator, "sql-separator", ";", "configure sql separator in th sql file")
+	cmd.Flags().StringVar(&app.outDir, "out-dir", "/tmp/sql/", "configure sql output dir")
 	return cmd
 }
 
 func (app *AppSQL) RunE(cmd *cobra.Command, args []string) error {
-	if app.SQLFile == "" {
+	if app.sqlFile == "" {
 		return fmt.Errorf("flag sql-file is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
-	return sql.RunSQL(engine, app.SQLFile, app.SQLSeparator, app.OutDir)
+	return sql.RunSQL(engine, app.sqlFile, app.sqlSeparator, app.outDir)
 }

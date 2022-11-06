@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -25,9 +25,19 @@ import (
 )
 
 // AppSplit is storage for the sub command analyze
-// includeTable、excludeTable、regexTable only one of the three
+// includeTable、excludeTables、regexTables only one of the three
 type AppSplit struct {
-	*App // embedded parent command storage
+	*App          // embedded parent command storage
+	host          string
+	port          int
+	user          string
+	password      string
+	dbName        string
+	all           bool
+	includeTables []string
+	excludeTables []string
+	regexTables   string
+	outDir        string
 }
 
 func (app *App) AppSplit() Cmder {
@@ -42,6 +52,17 @@ func (app *AppSplit) Cmd() *cobra.Command {
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
+
+	cmd.PersistentFlags().StringVarP(&app.host, "host", "", "127.0.0.1", "database host ip")
+	cmd.PersistentFlags().IntVarP(&app.port, "port", "P", 4000, "database service port")
+	cmd.PersistentFlags().StringVarP(&app.user, "user", "u", "root", "database user name")
+	cmd.PersistentFlags().StringVarP(&app.password, "password", "p", "", "database user password")
+	cmd.PersistentFlags().StringVarP(&app.dbName, "db", "D", "", "database name")
+	cmd.PersistentFlags().StringSliceVarP(&app.includeTables, "include", "i", nil, "configure table name")
+	cmd.PersistentFlags().StringSliceVarP(&app.excludeTables, "exclude", "e", nil, "configure exclude table name")
+	cmd.PersistentFlags().StringVarP(&app.regexTables, "regex", "r", "", "configure table name by go regexp")
+	cmd.PersistentFlags().BoolVar(&app.all, "all", false, "all tables in the database")
+	cmd.PersistentFlags().StringVarP(&app.outDir, "out-dir", "o", "/tmp/split", "gen split file output dir")
 	return cmd
 }
 
@@ -53,11 +74,10 @@ func (app *AppSplit) RunE(cmd *cobra.Command, args []string) error {
 }
 
 /*
-	Base range split
+Base range split
 */
 type AppSplitRange struct {
 	*AppSplit // embedded parent command storage
-	OutDir    string
 }
 
 func (app *AppSplit) AppSplitRange() Cmder {
@@ -72,39 +92,38 @@ func (app *AppSplitRange) Cmd() *cobra.Command {
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
-	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
 	return cmd
 }
 
 func (app *AppSplitRange) RunE(cmd *cobra.Command, args []string) error {
-	if app.DBName == "" {
+	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
-	if !engine.IsExistDbName(app.DBName) {
+	if !engine.IsExistDbName(app.dbName) {
 		return err
 	}
 
-	if app.All {
-		if err := split.AllTableSplitRange(app.DBName, app.Concurrency, app.OutDir, engine); err != nil {
+	if app.all {
+		if err := split.AllTableSplitRange(app.dbName, app.Concurrency, app.outDir, engine); err != nil {
 			return err
 		}
 	}
 
 	switch {
-	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "":
-		if err := split.IncludeTableSplitRange(app.DBName, app.Concurrency, app.IncludeTable, app.OutDir, engine); err != nil {
+	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "":
+		if err := split.IncludeTableSplitRange(app.dbName, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
 			return err
 		}
-	case app.IncludeTable == nil && app.ExcludeTable != nil && app.RegexTable == "":
-		if err := split.FilterTableSplitRange(app.DBName, app.Concurrency, app.IncludeTable, app.OutDir, engine); err != nil {
+	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "":
+		if err := split.FilterTableSplitRange(app.dbName, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
 			return err
 		}
-	case app.IncludeTable == nil && app.ExcludeTable == nil && app.RegexTable != "":
-		if err := split.RegexpTableSplitRange(app.DBName, app.Concurrency, app.RegexTable, app.OutDir, engine); err != nil {
+	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "":
+		if err := split.RegexpTableSplitRange(app.dbName, app.Concurrency, app.regexTables, app.outDir, engine); err != nil {
 			return err
 		}
 	default:
@@ -121,15 +140,14 @@ func (app *AppSplitRange) RunE(cmd *cobra.Command, args []string) error {
 */
 
 type AppSplitEstimate struct {
-	*AppSplit         // embedded parent command storage
-	EstimateTableRows int
-	EstimateTableSize int
-	RegionSize        int
-	ColumnName        string
-	NewDbName         string
-	NewTableName      string
-	NewIndexName      string
-	OutDir            string
+	*AppSplit          // embedded parent command storage
+	estimateTableRows  int
+	estimateTableSize  int
+	estimateColumnName string
+	regionSize         int
+	genDbName          string
+	genTableName       string
+	genIndexName       string
 }
 
 func (app *AppSplit) AppSplitEstimate() Cmder {
@@ -145,52 +163,51 @@ func (app *AppSplitEstimate) Cmd() *cobra.Command {
 		SilenceUsage: true,
 	}
 
-	cmd.Flags().IntVar(&app.EstimateTableRows, "new-table-row", 0, "estimate need be split table rows")
-	cmd.Flags().IntVar(&app.EstimateTableSize, "new-table-size", 0, "estimate need be split table size(M)")
-	cmd.Flags().IntVar(&app.RegionSize, "region-size", 96, "estimate need be split table region size(M)")
-	cmd.Flags().StringVar(&app.ColumnName, "col", "", "configure base estimate table column name")
-	cmd.Flags().StringVar(&app.NewDbName, "new-db", "", "configure generate split table new db name through base estimate table column name")
-	cmd.Flags().StringVar(&app.NewTableName, "new-table", "", "configure generate split table new table name through base estimate table column name")
-	cmd.Flags().StringVar(&app.NewIndexName, "new-index", "", "configure generate split table index name through base estimate table column name")
-	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
+	cmd.Flags().IntVar(&app.estimateTableRows, "estimate-row", 0, "estimate need be split table rows")
+	cmd.Flags().IntVar(&app.estimateTableSize, "estimate-size", 0, "estimate need be split table size(M)")
+	cmd.Flags().StringVar(&app.estimateColumnName, "estimate-column", "", "configure sample base estimate table column name")
+	cmd.Flags().IntVar(&app.regionSize, "region-size", 96, "estimate need be split table region size(M)")
+	cmd.Flags().StringVar(&app.genDbName, "gen-dbname", "", "configure generate split table new db name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genTableName, "gen-tableName", "", "configure generate split table new table name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genIndexName, "gen-indexName", "", "configure generate split table index name through base estimate table column name")
 
 	return cmd
 }
 
 func (app *AppSplitEstimate) RunE(cmd *cobra.Command, args []string) error {
-	if app.DBName == "" {
+	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
-	if !engine.IsExistDbName(app.DBName) {
+	if !engine.IsExistDbName(app.dbName) {
 		return err
 	}
 
 	//only support single table
 	switch {
-	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "":
-		if len(app.IncludeTable) != 1 {
+	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "":
+		if len(app.includeTables) != 1 {
 			return fmt.Errorf(" flag include only support configre single table")
 		}
-		if app.NewIndexName == "" {
+		if app.genIndexName == "" {
 			return fmt.Errorf("flag new index name is requirement, can not null")
 
 		}
 		if err := split.IncludeTableSplitEstimate(engine,
-			app.DBName,
-			app.IncludeTable[0],
-			app.ColumnName,
-			app.NewDbName,
-			app.NewTableName,
-			app.NewIndexName,
-			app.EstimateTableRows,
-			app.EstimateTableSize,
-			app.RegionSize,
+			app.dbName,
+			app.includeTables[0],
+			app.estimateColumnName,
+			app.genDbName,
+			app.genTableName,
+			app.genIndexName,
+			app.estimateTableRows,
+			app.estimateTableSize,
+			app.regionSize,
 			app.Concurrency,
-			app.OutDir); err != nil {
+			app.outDir); err != nil {
 			return err
 		}
 	default:
@@ -208,14 +225,13 @@ func (app *AppSplitEstimate) RunE(cmd *cobra.Command, args []string) error {
 
 type AppSplitSampling struct {
 	*AppSplit         // embedded parent command storage
-	EstimateTableRows int
-	BaseDbName        string
-	BaseTableName     string
-	BaseIndexName     string
-	NewDbName         string
-	NewTableName      string
-	NewIndexName      string
-	OutDir            string
+	estimateTableRows int
+	baseDbName        string
+	baseTableName     string
+	baseIndexName     string
+	genDbName         string
+	genTableName      string
+	genIndexName      string
 }
 
 func (app *AppSplit) AppSplitSampling() Cmder {
@@ -231,39 +247,39 @@ func (app *AppSplitSampling) Cmd() *cobra.Command {
 		SilenceUsage: true,
 	}
 
-	cmd.Flags().IntVar(&app.EstimateTableRows, "new-table-row", 0, "estimate need be split table rows")
-	cmd.Flags().StringVar(&app.BaseDbName, "base-db", "", "base estimate table db name")
-	cmd.Flags().StringVar(&app.BaseTableName, "base-table", "", "base estimate table name")
-	cmd.Flags().StringVar(&app.BaseIndexName, "base-index", "", "base estimate table index name")
-	cmd.Flags().StringVar(&app.NewDbName, "new-db", "", "configure generate split table new db name through base estimate table column name")
-	cmd.Flags().StringVar(&app.NewTableName, "new-table", "", "configure generate split table new table name through base estimate table column name")
-	cmd.Flags().StringVar(&app.NewIndexName, "new-index", "", "configure generate split table index name through base estimate table column name")
-	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
+	cmd.Flags().IntVar(&app.estimateTableRows, "estimate-row", 0, "estimate need be split table rows")
+	cmd.Flags().StringVar(&app.baseDbName, "base-db", "", "base estimate table db name")
+	cmd.Flags().StringVar(&app.baseTableName, "base-table", "", "base estimate table name")
+	cmd.Flags().StringVar(&app.baseIndexName, "base-index", "", "base estimate table index name")
+	cmd.Flags().StringVar(&app.genDbName, "gen-db", "", "configure generate split table new db name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genTableName, "gen-table", "", "configure generate split table new table name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genIndexName, "gen-index", "", "configure generate split table index name through base estimate table column name")
+	cmd.Flags().StringVarP(&app.outDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
 	return cmd
 }
 
 func (app *AppSplitSampling) validateParameters() error {
 	msg := "flag `%s` is requirement, can not null"
-	if app.BaseDbName == "" {
+	if app.baseDbName == "" {
 		return fmt.Errorf(msg, "base-db")
 	}
-	if app.BaseTableName == "" {
+	if app.baseTableName == "" {
 		return fmt.Errorf(msg, "base-table")
 	}
-	if app.BaseIndexName == "" {
+	if app.baseIndexName == "" {
 		return fmt.Errorf(msg, "base-index")
 	}
-	if app.NewDbName == "" {
-		return fmt.Errorf(msg, "new-db")
+	if app.genDbName == "" {
+		return fmt.Errorf(msg, "gen-db")
 	}
-	if app.NewTableName == "" {
-		return fmt.Errorf(msg, "new-table")
+	if app.genTableName == "" {
+		return fmt.Errorf(msg, "gen-table")
 	}
-	if app.NewIndexName == "" {
-		return fmt.Errorf(msg, "new-index")
+	if app.genIndexName == "" {
+		return fmt.Errorf(msg, "gen-index")
 	}
-	if app.EstimateTableRows == 0 {
-		return fmt.Errorf(msg, "new-table-row")
+	if app.estimateTableRows == 0 {
+		return fmt.Errorf(msg, "estimate-row")
 	}
 	return nil
 }
@@ -273,20 +289,20 @@ func (app *AppSplitSampling) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.BaseDbName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.baseDbName)
 	if err != nil {
 		return err
 	}
 
 	return split.GenerateSplitByBaseTable(engine,
-		app.BaseDbName,
-		app.BaseTableName,
-		app.BaseIndexName,
-		app.NewDbName,
-		app.NewTableName,
-		app.NewIndexName,
-		app.OutDir,
-		app.EstimateTableRows)
+		app.baseDbName,
+		app.baseTableName,
+		app.baseIndexName,
+		app.genDbName,
+		app.genTableName,
+		app.genIndexName,
+		app.outDir,
+		app.estimateTableRows)
 }
 
 /*
@@ -295,14 +311,13 @@ func (app *AppSplitSampling) RunE(cmd *cobra.Command, args []string) error {
 
 type AppSplitReckon struct {
 	*AppSplit         // embedded parent command storage
-	EstimateTableRows int
-	BaseDbName        string
-	BaseTableName     string
-	BaseIndexName     string
-	NewDbName         string
-	NewTableName      string
-	NewIndexName      string
-	OutDir            string
+	estimateTableRows int
+	baseDbName        string
+	baseTableName     string
+	baseIndexName     string
+	genDbName         string
+	genTableName      string
+	genIndexName      string
 }
 
 func (app *AppSplit) AppSplitReckon() Cmder {
@@ -317,39 +332,39 @@ func (app *AppSplitReckon) Cmd() *cobra.Command {
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
-	cmd.Flags().IntVar(&app.EstimateTableRows, "new-table-row", 0, "estimate need be split table rows")
-	cmd.Flags().StringVar(&app.BaseDbName, "base-db", "", "base estimate table db name")
-	cmd.Flags().StringVar(&app.BaseTableName, "base-table", "", "base estimate table name")
-	cmd.Flags().StringVar(&app.BaseIndexName, "base-index", "", "base estimate table index name")
-	cmd.Flags().StringVar(&app.NewDbName, "new-db", "", "configure generate split table new db name through base estimate table column name")
-	cmd.Flags().StringVar(&app.NewTableName, "new-table", "", "configure generate split table new table name through base estimate table column name")
-	cmd.Flags().StringVar(&app.NewIndexName, "new-index", "", "configure generate split table index name through base estimate table column name")
-	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
+	cmd.Flags().IntVar(&app.estimateTableRows, "estimate-row", 0, "estimate need be split table rows")
+	cmd.Flags().StringVar(&app.baseDbName, "base-db", "", "base estimate table db name")
+	cmd.Flags().StringVar(&app.baseTableName, "base-table", "", "base estimate table name")
+	cmd.Flags().StringVar(&app.baseIndexName, "base-index", "", "base estimate table index name")
+	cmd.Flags().StringVar(&app.genDbName, "gen-db", "", "configure generate split table new db name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genTableName, "gen-table", "", "configure generate split table new table name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genIndexName, "gen-index", "", "configure generate split table index name through base estimate table column name")
+	cmd.Flags().StringVarP(&app.outDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
 	return cmd
 }
 
 func (app *AppSplitReckon) validateParameters() error {
 	msg := "flag `%s` is requirement, can not null"
-	if app.BaseDbName == "" {
+	if app.baseDbName == "" {
 		return fmt.Errorf(msg, "base-db")
 	}
-	if app.BaseTableName == "" {
+	if app.baseTableName == "" {
 		return fmt.Errorf(msg, "base-table")
 	}
-	if app.BaseIndexName == "" {
+	if app.baseIndexName == "" {
 		return fmt.Errorf(msg, "base-index")
 	}
-	if app.NewDbName == "" {
-		return fmt.Errorf(msg, "new-db")
+	if app.genDbName == "" {
+		return fmt.Errorf(msg, "gen-db")
 	}
-	if app.NewTableName == "" {
-		return fmt.Errorf(msg, "new-table")
+	if app.genTableName == "" {
+		return fmt.Errorf(msg, "gen-table")
 	}
-	if app.NewIndexName == "" {
-		return fmt.Errorf(msg, "new-index")
+	if app.genIndexName == "" {
+		return fmt.Errorf(msg, "gen-index")
 	}
-	if app.EstimateTableRows == 0 {
-		return fmt.Errorf(msg, "new-table-row")
+	if app.estimateTableRows == 0 {
+		return fmt.Errorf(msg, "estimate-row")
 	}
 	return nil
 }
@@ -359,30 +374,29 @@ func (app *AppSplitReckon) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.BaseDbName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.baseDbName)
 	if err != nil {
 		return err
 	}
 
 	return split.GenerateSplitByReckonBaseTable(engine,
-		app.BaseDbName,
-		app.BaseTableName,
-		app.BaseIndexName,
-		app.NewDbName,
-		app.NewTableName,
-		app.NewIndexName,
-		app.OutDir,
-		app.EstimateTableRows)
+		app.baseDbName,
+		app.baseTableName,
+		app.baseIndexName,
+		app.genDbName,
+		app.genTableName,
+		app.genIndexName,
+		app.outDir,
+		app.estimateTableRows)
 }
 
 /*
-	Base key split
+Base key split
 */
 type AppSplitKey struct {
 	// embedded parent command storage
 	*AppSplit
-	TiDBStatusPort int
-	OutDir         string
+	tidbStatusPort int
 }
 
 func (app *AppSplit) AppSplitKey() Cmder {
@@ -397,43 +411,43 @@ func (app *AppSplitKey) Cmd() *cobra.Command {
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
-	cmd.Flags().IntVar(&app.TiDBStatusPort, "status-port", 10080, "tidb server status port")
-	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
+	cmd.Flags().IntVar(&app.tidbStatusPort, "status-port", 10080, "tidb server status port")
+	cmd.Flags().StringVarP(&app.outDir, "out-dir", "o", "/tmp/split", "split sql file output dir")
 
 	return cmd
 }
 
 func (app *AppSplitKey) RunE(cmd *cobra.Command, args []string) error {
-	if app.DBName == "" {
+	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
-	if !engine.IsExistDbName(app.DBName) {
+	if !engine.IsExistDbName(app.dbName) {
 		return err
 	}
 
 	// get tidb server status port
-	statusAddr := fmt.Sprintf("%s:%d", app.Host, app.TiDBStatusPort)
-	if app.All {
-		if err := split.AllTableSplitKey(app.DBName, statusAddr, app.Concurrency, app.OutDir, engine); err != nil {
+	statusAddr := fmt.Sprintf("%s:%d", app.host, app.tidbStatusPort)
+	if app.all {
+		if err := split.AllTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.outDir, engine); err != nil {
 			return err
 		}
 	}
 
 	switch {
-	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "":
-		if err := split.IncludeTableSplitKey(app.DBName, statusAddr, app.Concurrency, app.IncludeTable, app.OutDir, engine); err != nil {
+	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "":
+		if err := split.IncludeTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
 			return err
 		}
-	case app.IncludeTable == nil && app.ExcludeTable != nil && app.RegexTable == "":
-		if err := split.FilterTableSplitKey(app.DBName, statusAddr, app.Concurrency, app.IncludeTable, app.OutDir, engine); err != nil {
+	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "":
+		if err := split.FilterTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
 			return err
 		}
-	case app.IncludeTable == nil && app.ExcludeTable == nil && app.RegexTable != "":
-		if err := split.RegexpTableSplitKey(app.DBName, statusAddr, app.Concurrency, app.RegexTable, app.OutDir, engine); err != nil {
+	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "":
+		if err := split.RegexpTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.regexTables, app.outDir, engine); err != nil {
 			return err
 		}
 	default:

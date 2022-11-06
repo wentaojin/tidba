@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -27,10 +27,19 @@ import (
 
 // AppTable is storage for the sub command analyze
 type AppTable struct {
-	*App // embedded parent command storage
+	*App          // embedded parent command storage
+	host          string
+	port          int
+	user          string
+	password      string
+	dbName        string
+	all           bool
+	includeTables []string
+	excludeTables []string
+	regexTables   string
 }
 
-//  is a method of App that returns a Cmder instance for the sub command
+// is a method of App that returns a Cmder instance for the sub command
 func (app *App) AppTable() Cmder {
 	return &AppTable{App: app}
 }
@@ -45,6 +54,15 @@ func (app *AppTable) Cmd() *cobra.Command {
 		TraverseChildren: true,
 		SilenceUsage:     true,
 	}
+	cmd.PersistentFlags().StringVarP(&app.host, "host", "", "127.0.0.1", "database host ip")
+	cmd.PersistentFlags().IntVarP(&app.port, "port", "P", 4000, "database service port")
+	cmd.PersistentFlags().StringVarP(&app.user, "user", "u", "root", "database user name")
+	cmd.PersistentFlags().StringVarP(&app.password, "password", "p", "", "database user password")
+	cmd.PersistentFlags().StringVarP(&app.dbName, "db", "D", "", "database name")
+	cmd.PersistentFlags().StringSliceVarP(&app.includeTables, "include", "i", nil, "configure table name")
+	cmd.PersistentFlags().StringSliceVarP(&app.excludeTables, "exclude", "e", nil, "configure exclude table name")
+	cmd.PersistentFlags().StringVarP(&app.regexTables, "regex", "r", "", "configure table name by go regexp")
+	cmd.PersistentFlags().BoolVar(&app.all, "all", false, "all tables in the database")
 	return cmd
 }
 
@@ -65,7 +83,7 @@ type AppTableAnalyze struct {
 	Interval int // app run interval
 }
 
-//  is a method of App that returns a Cmder instance for the sub command
+// is a method of App that returns a Cmder instance for the sub command
 func (app *AppTable) AppTableAnalyze() Cmder {
 	return &AppTableAnalyze{AppTable: app}
 }
@@ -86,41 +104,41 @@ func (app *AppTableAnalyze) Cmd() *cobra.Command {
 
 // RunE is a main routine of the sub command, returning a nil
 func (app *AppTableAnalyze) RunE(cmd *cobra.Command, args []string) error {
-	if app.DBName == "" {
+	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
-	if !engine.IsExistDbName(app.DBName) {
+	if !engine.IsExistDbName(app.dbName) {
 		return err
 	}
 
-	if app.All {
+	if app.all {
 		for range time.Tick(time.Duration(app.Interval) * time.Second) {
-			if err := table.AllTableAnalyze(app.DBName, app.Concurrency, engine); err != nil {
+			if err := table.AllTableAnalyze(app.dbName, app.Concurrency, engine); err != nil {
 				return err
 			}
 		}
 	}
 
 	switch {
-	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "":
+	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "":
 		for range time.Tick(time.Duration(app.Interval) * time.Second) {
-			if err := table.IncludeTableAnalyze(app.DBName, app.Concurrency, app.IncludeTable, engine); err != nil {
+			if err := table.IncludeTableAnalyze(app.dbName, app.Concurrency, app.includeTables, engine); err != nil {
 				return err
 			}
 		}
-	case app.IncludeTable == nil && app.ExcludeTable != nil && app.RegexTable == "":
+	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "":
 		for range time.Tick(time.Duration(app.Interval) * time.Second) {
-			if err := table.FilterTableAnalyze(app.DBName, app.Concurrency, app.ExcludeTable, engine); err != nil {
+			if err := table.FilterTableAnalyze(app.dbName, app.Concurrency, app.excludeTables, engine); err != nil {
 				return err
 			}
 		}
-	case app.IncludeTable == nil && app.ExcludeTable == nil && app.RegexTable != "":
+	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "":
 		for range time.Tick(time.Duration(app.Interval) * time.Second) {
-			if err := table.RegexpTableAnalyze(app.DBName, app.Concurrency, app.RegexTable, engine); err != nil {
+			if err := table.RegexpTableAnalyze(app.dbName, app.Concurrency, app.regexTables, engine); err != nil {
 				return err
 			}
 		}
@@ -138,10 +156,10 @@ func (app *AppTableAnalyze) RunE(cmd *cobra.Command, args []string) error {
 // includeTable、excludeTable、regexTable only one of the three
 type AppTableRegion struct {
 	*AppTable
-	IndexName []string
+	indexName []string
 }
 
-//  is a method of App that returns a Cmder instance for the sub command
+// is a method of App that returns a Cmder instance for the sub command
 func (app *AppTable) AppTableRegion() Cmder {
 	return &AppTableRegion{AppTable: app}
 }
@@ -155,59 +173,59 @@ func (app *AppTableRegion) Cmd() *cobra.Command {
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
-	cmd.Flags().StringSliceVar(&app.IndexName, "index", nil, "configure table index name")
+	cmd.Flags().StringSliceVar(&app.indexName, "index", nil, "configure table index name")
 
 	return cmd
 }
 
 // RunE is a main routine of the sub command, returning a nil
 func (app *AppTableRegion) RunE(cmd *cobra.Command, args []string) error {
-	if app.DBName == "" {
+	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
-	if !engine.IsExistDbName(app.DBName) {
+	if !engine.IsExistDbName(app.dbName) {
 		return err
 	}
 
-	if app.All {
-		if err := table.AllTableRegionDataView(app.DBName, app.Concurrency, engine); err != nil {
+	if app.all {
+		if err := table.AllTableRegionDataView(app.dbName, app.Concurrency, engine); err != nil {
 			return err
 		}
-		if err := table.AllTableRegionIndexView(app.DBName, app.Concurrency, app.IndexName, engine); err != nil {
+		if err := table.AllTableRegionIndexView(app.dbName, app.Concurrency, app.indexName, engine); err != nil {
 			return err
 		}
 	}
 	switch {
-	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "" && app.IndexName == nil:
-		if err := table.IncludeTableRegionDataView(app.DBName, app.Concurrency, app.IncludeTable, engine); err != nil {
+	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "" && app.indexName == nil:
+		if err := table.IncludeTableRegionDataView(app.dbName, app.Concurrency, app.includeTables, engine); err != nil {
 			return err
 		}
 
-	case app.IncludeTable == nil && app.ExcludeTable != nil && app.RegexTable == "" && app.IndexName == nil:
-		if err := table.FilterTableRegionDataView(app.DBName, app.Concurrency, app.ExcludeTable, engine); err != nil {
+	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "" && app.indexName == nil:
+		if err := table.FilterTableRegionDataView(app.dbName, app.Concurrency, app.excludeTables, engine); err != nil {
 			return err
 		}
 
-	case app.IncludeTable == nil && app.ExcludeTable == nil && app.RegexTable != "" && app.IndexName == nil:
-		if err := table.RegexpTableRegionDataView(app.DBName, app.Concurrency, app.RegexTable, engine); err != nil {
+	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "" && app.indexName == nil:
+		if err := table.RegexpTableRegionDataView(app.dbName, app.Concurrency, app.regexTables, engine); err != nil {
 			return err
 		}
 
-	case app.IncludeTable != nil && app.ExcludeTable == nil && app.RegexTable == "" && app.IndexName != nil:
-		if err := table.IncludeTableRegionIndexView(app.DBName, app.Concurrency, app.IncludeTable, app.IndexName, engine); err != nil {
+	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "" && app.indexName != nil:
+		if err := table.IncludeTableRegionIndexView(app.dbName, app.Concurrency, app.includeTables, app.indexName, engine); err != nil {
 			return err
 		}
 
-	case app.IncludeTable == nil && app.ExcludeTable != nil && app.RegexTable == "" && app.IndexName != nil:
-		if err := table.FilterTableRegionIndexView(app.DBName, app.Concurrency, app.ExcludeTable, app.IndexName, engine); err != nil {
+	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "" && app.indexName != nil:
+		if err := table.FilterTableRegionIndexView(app.dbName, app.Concurrency, app.excludeTables, app.indexName, engine); err != nil {
 			return err
 		}
-	case app.IncludeTable == nil && app.ExcludeTable == nil && app.RegexTable != "" && app.IndexName != nil:
-		if err := table.RegexpTableRegionIndexView(app.DBName, app.Concurrency, app.RegexTable, app.IndexName, engine); err != nil {
+	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "" && app.indexName != nil:
+		if err := table.RegexpTableRegionIndexView(app.dbName, app.Concurrency, app.regexTables, app.indexName, engine); err != nil {
 			return err
 		}
 	default:

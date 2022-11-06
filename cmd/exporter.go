@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,12 +23,7 @@ import (
 
 // AppExporter
 type AppExporter struct {
-	*App       // embedded parent command storage
-	KeyFormat  string
-	TableID    int64
-	IndexID    int64
-	RowValue   string
-	IndexValue string
+	*App // embedded parent command storage
 }
 
 func (app *App) AppExporter() Cmder {
@@ -54,16 +49,21 @@ func (app *AppExporter) RunE(cmd *cobra.Command, args []string) error {
 }
 
 /*
-	Exporter user info
+Exporter user info
 */
 type AppExporterUser struct {
 	*AppExporter    // embedded parent command storage
-	AllUser         bool
-	ClusterVersion  int
-	IncludeUsername []string
-	ExcludeUsername []string
-	RegexpUsername  string
-	OutDir          string
+	host            string
+	port            int
+	user            string
+	password        string
+	dbName          string
+	allUser         bool
+	clusterVersion  int
+	includeUsername []string
+	excludeUsername []string
+	regexpUsername  string
+	outDir          string
 }
 
 func (app *AppExporter) AppExporterUser() Cmder {
@@ -78,37 +78,42 @@ func (app *AppExporterUser) Cmd() *cobra.Command {
 		RunE:         app.RunE,
 		SilenceUsage: true,
 	}
-	cmd.Flags().BoolVar(&app.AllUser, "all-user", false, "exporter all user(no-root) info in the database")
-	cmd.Flags().StringSliceVar(&app.IncludeUsername, "include-user", nil, "exporter designated user info in the database")
-	cmd.Flags().StringSliceVar(&app.ExcludeUsername, "exclude-user", nil, "exporter other user info in the database")
-	cmd.Flags().StringVar(&app.RegexpUsername, "regexp-user", "", "exporter regexp user info in the database")
-	cmd.Flags().IntVar(&app.ClusterVersion, "cluster-version", 4, "configure cluster version, for example: 2、3、4、5")
-	cmd.Flags().StringVarP(&app.OutDir, "out-dir", "o", "/tmp/exporter", "exporter sql file output dir")
+	cmd.Flags().StringVarP(&app.host, "host", "", "127.0.0.1", "database host ip")
+	cmd.Flags().IntVarP(&app.port, "port", "P", 4000, "database service port")
+	cmd.Flags().StringVarP(&app.user, "user", "u", "root", "database user name")
+	cmd.Flags().StringVarP(&app.password, "password", "p", "", "database user password")
+	cmd.Flags().StringVarP(&app.dbName, "db", "D", "", "database name")
+	cmd.Flags().BoolVar(&app.allUser, "all-user", false, "exporter all user(no-root) info in the database")
+	cmd.Flags().StringSliceVar(&app.includeUsername, "include-user", nil, "exporter designated user info in the database")
+	cmd.Flags().StringSliceVar(&app.excludeUsername, "exclude-user", nil, "exporter other user info in the database")
+	cmd.Flags().StringVar(&app.regexpUsername, "regexp-user", "", "exporter regexp user info in the database")
+	cmd.Flags().IntVar(&app.clusterVersion, "cluster-version", 4, "configure cluster version, for example: 2、3、4、5")
+	cmd.Flags().StringVarP(&app.outDir, "out-dir", "o", "/tmp/exporter", "exporter sql file output dir")
 	return cmd
 }
 
 func (app *AppExporterUser) RunE(cmd *cobra.Command, args []string) error {
-	engine, err := db.NewMysqlDSN(app.User, app.Password, app.Host, app.Port, app.DBName)
+	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
-	if app.All {
-		if err := exporter.AllUserExporter(app.ClusterVersion, app.OutDir, engine); err != nil {
+	if app.allUser {
+		if err := exporter.AllUserExporter(app.clusterVersion, app.outDir, engine); err != nil {
 			return err
 		}
 	}
-	if app.IncludeUsername != nil {
-		if err := exporter.IncludeUserExporter(app.ClusterVersion, app.IncludeUsername, app.OutDir, engine); err != nil {
+	if app.includeUsername != nil {
+		if err := exporter.IncludeUserExporter(app.clusterVersion, app.includeUsername, app.outDir, engine); err != nil {
 			return err
 		}
 	}
-	if app.ExcludeUsername != nil {
-		if err := exporter.FilterUserExporter(app.ClusterVersion, app.ExcludeUsername, app.OutDir, engine); err != nil {
+	if app.excludeUsername != nil {
+		if err := exporter.FilterUserExporter(app.clusterVersion, app.excludeUsername, app.outDir, engine); err != nil {
 			return err
 		}
 	}
-	if app.RegexpUsername != "" {
-		if err := exporter.RegexpUserExporter(app.ClusterVersion, app.RegexpUsername, app.OutDir, engine); err != nil {
+	if app.regexpUsername != "" {
+		if err := exporter.RegexpUserExporter(app.clusterVersion, app.regexpUsername, app.outDir, engine); err != nil {
 			return err
 		}
 	}

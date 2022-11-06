@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,6 +18,7 @@ package diff
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/wentaojin/tidba/pkg/db"
@@ -72,11 +73,22 @@ func ComponentTiDBDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newPa
 }
 
 func getClusterJsonDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newPassword, diffType, format string, coloring, quiet bool) error {
-	baseJsonByte, err := getClusterJson(baseAddr, baseUser, basePassword, diffType)
+	baseAddrArr := strings.Split(baseAddr, ":")
+	basePort, err := strconv.Atoi(baseAddrArr[1])
 	if err != nil {
 		return err
 	}
-	newJsonByte, err := getClusterJson(newAddr, newUser, newPassword, diffType)
+	baseJsonByte, err := getClusterJson(baseAddrArr[0], baseUser, basePassword, basePort, diffType)
+	if err != nil {
+		return err
+	}
+
+	newAddrArr := strings.Split(newAddr, ":")
+	newPort, err := strconv.Atoi(newAddrArr[1])
+	if err != nil {
+		return err
+	}
+	newJsonByte, err := getClusterJson(newAddr, newUser, newPassword, newPort, diffType)
 	if err != nil {
 		return err
 	}
@@ -87,9 +99,8 @@ func getClusterJsonDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newP
 	return nil
 }
 
-func getClusterJson(addr, user, password string, diffType string) ([]byte, error) {
-	addrs := strings.Split(addr, ":")
-	baseEngine, err := db.NewMysqlDSN(user, password, addrs[0], addrs[1], "")
+func getClusterJson(host, user, password string, port int, diffType string) ([]byte, error) {
+	baseEngine, err := db.NewMysqlDSN(user, password, host, port, "")
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +112,7 @@ func getClusterJson(addr, user, password string, diffType string) ([]byte, error
 		}
 		bd, err := json.Marshal(baseData)
 		if err != nil {
-			return bd, fmt.Errorf("newAddr [%s] json.Marshal failed: %v", addr, err)
+			return bd, fmt.Errorf("newAddr [%s] json.Marshal failed: %v", fmt.Sprintf("%s:%d", host, port), err)
 		}
 		return bd, nil
 
@@ -113,7 +124,7 @@ func getClusterJson(addr, user, password string, diffType string) ([]byte, error
 		}
 		bd, err := json.Marshal(baseData)
 		if err != nil {
-			return bd, fmt.Errorf("newAddr [%s] json.Marshal failed: %v", addr, err)
+			return bd, fmt.Errorf("newAddr [%s] json.Marshal failed: %v", fmt.Sprintf("%s:%d", host, port), err)
 		}
 		return bd, nil
 	} else {

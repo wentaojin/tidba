@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,6 +17,7 @@ package table
 
 import (
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"strings"
 	"sync"
 
@@ -28,7 +29,7 @@ import (
 )
 
 /*
-	table region data leader view
+table region data leader view
 */
 func IncludeTableRegionDataView(dbName string, concurrency int, includeTables []string, engine *db.Engine) error {
 	allTables, err := db.GetAllTables(dbName, engine)
@@ -41,60 +42,49 @@ func IncludeTableRegionDataView(dbName string, concurrency int, includeTables []
 		return fmt.Errorf("db %s table '%v' not exist", dbName, notExistTables)
 	}
 
-	wg := sync.WaitGroup{}
-	jobsChannel := make(chan string, len(includeTables))
-
 	fmt.Printf(">--------+  DB: %s  +--------<\n", dbName)
-	for i := 0; i < concurrency; i++ {
-		go func(threadID int) {
-			for j := range jobsChannel {
-				sql := fmt.Sprintf(`SELECT
-  table_name,
-  store_id,
-	count( * ) as leader_counts
-FROM
-	(
-SELECT
-	t1.table_name,
-	t1.region_id,
-	t2.store_id 
-FROM
-	information_schema.TIKV_REGION_STATUS t1,
-	information_schema.TIKV_REGION_PEERS t2 
-WHERE
-	t1.region_id = t2.region_id 
-	AND lower(t1.db_name) = lower('%s') 
-	AND lower(t1.table_name) = lower('%s') 
-	AND t1.is_index = 0 
-	AND t2.is_leader = 1 
-	) t 
-GROUP BY
-	store_id,
-  table_name
-ORDER BY
-	3
-  DESC`, dbName, j)
-				cols, res, err := engine.QuerySQL(sql)
-				if err != nil {
-					zlog.Logger.Fatal("Task run sql failed",
-						zap.Int("threadID", threadID),
-						zap.String("sql", sql),
-						zap.Error(err),
-					)
-				}
-				util.QueryResultFormatTableWithBaseStyle(cols, res)
-				fmt.Printf("threadID [%d] task execute success.\n", threadID)
-				wg.Done()
-			}
-		}(i)
-	}
-
+	g := &errgroup.Group{}
+	g.SetLimit(concurrency)
 	for _, t := range includeTables {
-		jobsChannel <- t
-		wg.Add(1)
-
+		sql := fmt.Sprintf(`SELECT
+			table_name,
+			store_id,
+			  count( * ) as leader_counts
+		  FROM
+			  (
+		  SELECT
+			  t1.table_name,
+			  t1.region_id,
+			  t2.store_id 
+		  FROM
+			  information_schema.TIKV_REGION_STATUS t1,
+			  information_schema.TIKV_REGION_PEERS t2 
+		  WHERE
+			  t1.region_id = t2.region_id 
+			  AND lower(t1.db_name) = lower('%s') 
+			  AND lower(t1.table_name) = lower('%s') 
+			  AND t1.is_index = 0 
+			  AND t2.is_leader = 1 
+			  ) t 
+		  GROUP BY
+			  store_id,
+			table_name
+		  ORDER BY
+			  3
+			DESC`, dbName, t)
+		g.Go(func() error {
+			cols, res, err := engine.QuerySQL(sql)
+			if err != nil {
+				return err
+			}
+			util.QueryResultFormatTableWithBaseStyle(cols, res)
+			return nil
+		})
 	}
-	wg.Wait()
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -293,7 +283,7 @@ ORDER BY
 }
 
 /*
-	table region index leader view
+table region index leader view
 */
 func IncludeTableRegionIndexView(dbName string, concurrency int, includeTables []string, indexNames []string, engine *db.Engine) error {
 	allTables, err := db.GetAllTables(dbName, engine)
