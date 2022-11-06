@@ -5,36 +5,8 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="05a1c144-0428-4673-b988-9d14f0b789e1" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/.gitignore" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/codeStyles/Project.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dbnavigator.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/markdown-navigator-enh.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/markdown-navigator.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/modules.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/tidba.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/tidba.iml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/watcherTasks.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/diff.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/diff.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/exporter.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/exporter.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/split.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/split.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/sql.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/sql.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/table.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/table.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmd/tidba.go" beforeDir="false" afterPath="$PROJECT_DIR$/cmd/tidba.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.mod" beforeDir="false" afterPath="$PROJECT_DIR$/go.mod" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/go.sum" beforeDir="false" afterPath="$PROJECT_DIR$/go.sum" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/db/mysqldb.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/db/mysqldb.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/diff/tidb.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/diff/tidb.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pkg/table/region.go" beforeDir="false" afterPath="$PROJECT_DIR$/pkg/table/region.go" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/split/exporter_user_grants.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/split/split_kb_k_1_by_reckon.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/split/split_kb_k_1_by_sampling.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/split/sql_by_tidba.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/split/sql_test.sql" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/test_conncurrency.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/test_estimate.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/test_set.go" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/test/test_sort.go" beforeDir="false" />
+      <change afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
