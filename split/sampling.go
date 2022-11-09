@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,8 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
+	"log"
 	"math"
 	"os"
 	"path"
@@ -27,11 +29,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/wentaojin/tidba/zlog"
-	"go.uber.org/zap"
-
-	"github.com/wentaojin/tidba/pkg/db"
 )
 
 func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, newDB, newTable, newIndex, outDir string, totalWriteRows int) error {
@@ -80,9 +77,7 @@ func GenerateSplitByBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, n
 
 	s.close()
 	endTime := time.Now()
-	zlog.Logger.Info("Run task info",
-		zap.String("generate split table sql total cost time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("generate split table sql total cost time: %v.\n", endTime.Sub(startTime).String())
 	return nil
 }
 
@@ -174,7 +169,7 @@ func (s *splitByBase) getBaseTableIndex(engine *db.Engine) error {
 	condition := fmt.Sprintf("where lower(table_name)=lower('%s') and lower(table_schema)=lower('%s') and lower(KEY_NAME) = lower ('%s') order by SEQ_IN_INDEX",
 		s.baseTable, s.baseDB, s.baseIndex)
 	query := fmt.Sprintf("select COLUMN_NAME from INFORMATION_SCHEMA.TIDB_INDEXES %s", condition)
-	err := queryRows(engine.DB, query, func(row, cols []string) error {
+	err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		if len(row) != 1 {
 			panic("result row is not index column name, should never happen")
 		}
@@ -195,16 +190,14 @@ func (s *splitByBase) getBaseDistinctValues(engine *db.Engine) error {
 	idxCols := strings.Join(s.baseIndexInfo.ColumnName, ",")
 	query := fmt.Sprintf("select distinct %s from %s order by %s",
 		idxCols, s.tableName(s.baseDB, s.baseTable), idxCols)
-	rows, err := queryAllRows(engine.DB, query)
+	rows, err := queryAllRows(engine.MySQLDB, query)
 	if err != nil {
 		return err
 	}
 	s.distinctValues = rows
 	endTime := time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("get base table distinct values", endTime.Sub(startTime).String()),
-	)
+	log.Printf("get base table distinct values: %v.\n", endTime.Sub(startTime).String())
 
 	return nil
 }
@@ -216,9 +209,7 @@ func (s *splitByBase) calculateRegionNum(engine *db.Engine, totalWriteRows int) 
 		return 0, err
 	}
 	endTime := time.Now()
-	zlog.Logger.Info("Run task info",
-		zap.String("get base table record counts", endTime.Sub(startTime).String()),
-	)
+	log.Printf("get base table record counts: %v.\n", endTime.Sub(startTime).String())
 
 	startTime = time.Now()
 	baseIndexRegions, err := s.getBaseTableIndexRegionCount(engine)
@@ -241,11 +232,10 @@ func (s *splitByBase) calculateRegionNum(engine *db.Engine, totalWriteRows int) 
 		count = 1
 	}
 	endTime = time.Now()
-	zlog.Logger.Info("Run task info",
-		zap.Int("get base table index regions", baseIndexRegions),
-		zap.Int("sampling split table index regions", int(count)),
-		zap.String("cost time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("run task info, get base table index regions [%d], sampling split table index regions [%d], cost time [%v]",
+		baseIndexRegions,
+		int(count),
+		endTime.Sub(startTime).String())
 
 	return int(count), nil
 }
@@ -253,7 +243,7 @@ func (s *splitByBase) calculateRegionNum(engine *db.Engine, totalWriteRows int) 
 func (s *splitByBase) getBaseTableCount(engine *db.Engine) (int, error) {
 	count := 0
 	query := fmt.Sprintf("select count(1) from %v", s.tableName(s.baseDB, s.baseTable))
-	err := queryRows(engine.DB, query, func(row, cols []string) error {
+	err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		if len(row) != 1 {
 			panic("result row is not row counts, should never happen")
 		}
@@ -270,7 +260,7 @@ func (s *splitByBase) getBaseTableCount(engine *db.Engine) (int, error) {
 func (s *splitByBase) getBaseTableIndexRegionCount(engine *db.Engine) (int, error) {
 	count := 0
 	query := fmt.Sprintf("show table %s index %s regions", s.tableName(s.baseDB, s.baseTable), s.baseIndex)
-	err := queryRows(engine.DB, query, func(row, cols []string) error {
+	err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		count++
 		return nil
 	})

@@ -18,10 +18,9 @@ package diff
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
 	"strconv"
 	"strings"
-
-	"github.com/wentaojin/tidba/pkg/db"
 )
 
 const (
@@ -100,7 +99,7 @@ func getClusterJsonDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newP
 }
 
 func getClusterJson(host, user, password string, port int, diffType string) ([]byte, error) {
-	baseEngine, err := db.NewMysqlDSN(user, password, host, port, "")
+	baseEngine, err := db.NewMySQLEngine(user, password, host, port, "")
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +133,7 @@ func getClusterJson(host, user, password string, port int, diffType string) ([]b
 
 func getQueryVariablesResultBySQL(engine *db.Engine) (map[string]interface{}, error) {
 	var data map[string]interface{}
-	_, res, err := engine.QuerySQL(sqlQueryVariables)
+	_, res, err := engine.Query(sqlQueryVariables)
 	if err != nil {
 		return data, err
 	}
@@ -151,7 +150,7 @@ func getQueryConfigResultBySQL(engine *db.Engine) (map[string]interface{}, error
 		data string
 		d    map[string]interface{}
 	)
-	_, res, err := engine.QuerySQL(sqlQueryConfig)
+	_, res, err := engine.Query(sqlQueryConfig)
 	if err != nil {
 		return d, err
 	}

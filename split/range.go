@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,24 +20,21 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
+	"github.com/wentaojin/tidba/util"
+	"go.uber.org/zap"
+	"golang.org/x/sync/errgroup"
+	"log"
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/wentaojin/tidba/zlog"
-	"go.uber.org/zap"
-
-	"github.com/wentaojin/tidba/pkg/db"
-
-	"github.com/wentaojin/tidba/pkg/util"
 )
 
 func IncludeTableSplitRange(dbName string, concurrency int, includeTables []string, outDir string, engine *db.Engine) error {
 	var tasks []*Task
 
-	allTables, err := db.GetAllTables(dbName, engine)
+	allTables, err := engine.GetAllTables(dbName)
 	if err != nil {
 		return err
 	}
@@ -62,7 +59,7 @@ func IncludeTableSplitRange(dbName string, concurrency int, includeTables []stri
 }
 
 func FilterTableSplitRange(dbName string, concurrency int, excludeTables []string, outDir string, engine *db.Engine) error {
-	allTables, err := db.GetAllTables(dbName, engine)
+	allTables, err := engine.GetAllTables(dbName)
 	if err != nil {
 		return err
 	}
@@ -87,7 +84,7 @@ func FilterTableSplitRange(dbName string, concurrency int, excludeTables []strin
 }
 
 func RegexpTableSplitRange(dbName string, concurrency int, regex string, outDir string, engine *db.Engine) error {
-	allTables, err := db.GetAllTables(dbName, engine)
+	allTables, err := engine.GetAllTables(dbName)
 	if err != nil {
 		return err
 	}
@@ -110,7 +107,7 @@ func RegexpTableSplitRange(dbName string, concurrency int, regex string, outDir 
 }
 
 func AllTableSplitRange(dbName string, concurrency int, outDir string, engine *db.Engine) error {
-	allTables, err := db.GetAllTables(dbName, engine)
+	allTables, err := engine.GetAllTables(dbName)
 	if err != nil {
 		return err
 	}
@@ -126,7 +123,9 @@ func AllTableSplitRange(dbName string, concurrency int, outDir string, engine *d
 		})
 	}
 
-	taskConcurrencyRunRange(tasks, concurrency, runSplitTableRange)
+	if err := taskConcurrencyRunRange(tasks, concurrency, runSplitTableRange); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -134,43 +133,28 @@ func AllTableSplitRange(dbName string, concurrency int, outDir string, engine *d
 	Split range
 */
 // split table region by range
-func taskConcurrencyRunRange(tasks []*Task, concurrency int, fn func(engine *db.Engine, dbName, tableName, outDir string) (TableInfo, error)) {
-	wg := sync.WaitGroup{}
-	jobsChannel := make(chan *Task, len(tasks))
-	for i := 0; i < concurrency; i++ {
-		go func(threadID int) {
-			for j := range jobsChannel {
-				tableInfo, err := fn(j.Engine, j.DbName, j.TableName, j.OutDir)
-				if err != nil {
-					zlog.Logger.Fatal("Task execute failed",
-						zap.Int("taskID", j.TaskID),
-						zap.Int("threadID", threadID),
-						zap.Error(err),
-					)
-				}
-				t, err := json.Marshal(tableInfo)
-				if err != nil {
-					zlog.Logger.Fatal("Task json table info struct failed",
-						zap.Int("taskID", j.TaskID),
-						zap.Int("threadID", threadID),
-						zap.String("tableInfo", string(t)),
-					)
-				}
-				zlog.Logger.Info("Task execute success",
-					zap.Int("taskID", j.TaskID),
-					zap.Int("threadID", threadID),
-					zap.String("tableInfo", string(t)))
-				wg.Done()
-			}
-		}(i)
-	}
-
+func taskConcurrencyRunRange(tasks []*Task, concurrency int, fn func(engine *db.Engine, dbName, tableName, outDir string) (TableInfo, error)) error {
+	g := &errgroup.Group{}
+	g.SetLimit(concurrency)
 	for _, task := range tasks {
-		jobsChannel <- task
-		wg.Add(1)
-
+		j := task
+		g.Go(func() error {
+			tableInfo, err := fn(j.Engine, j.DbName, j.TableName, j.OutDir)
+			if err != nil {
+				return err
+			}
+			_, err = json.Marshal(tableInfo)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
 	}
-	wg.Wait()
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func runSplitTableRange(engine *db.Engine, dbName string, tableName string, outDir string) (TableInfo, error) {
@@ -212,7 +196,7 @@ func splitRangeTableRun(engine *db.Engine, dbName string, tableName string, outD
 		SQL: query,
 	})
 
-	if err := queryRows(engine.DB, query, func(row, cols []string) error {
+	if err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		if len(row) != 1 {
 			return fmt.Errorf("table [%s.%s] is not index name, should never happen", dbName, tableName)
 		}
@@ -224,9 +208,7 @@ func splitRangeTableRun(engine *db.Engine, dbName string, tableName string, outD
 
 	endTime := time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("sql get table all index name total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("sql get table all index name total time: %v.\n", endTime.Sub(startTime).String())
 
 	startTime = time.Now()
 	// get table index all columns value
@@ -247,7 +229,7 @@ ORDER BY
 		})
 
 		var columns []string
-		if err := queryRows(engine.DB, query, func(row, cols []string) error {
+		if err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 			if len(row) != 1 {
 				return fmt.Errorf("table [%s.%s] is not index column name, should never happen", dbName, tableName)
 			}
@@ -260,16 +242,14 @@ ORDER BY
 	}
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("sql get table all index column total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("sql get table all index column total time: %v.\n", endTime.Sub(startTime).String())
 
 	// find _tidb_rowid handle name(bigint or tidb_rowid)
 	query = fmt.Sprintf("select * from %s.%s where _tidb_rowid = 1", dbName, tableName)
 	tableInfo.SQL = append(tableInfo.SQL, SqlInfo{
 		SQL: query,
 	})
-	err := queryRows(engine.DB, query, func(row, cols []string) error {
+	err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		return nil
 	})
 	if err == nil {
@@ -321,7 +301,7 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 		SQL: query,
 	})
 
-	if err = queryRows(engine.DB, query, func(row, cols []string) error {
+	if err = queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		if len(row) != 1 {
 			return fmt.Errorf("result row is not index column name, should never happen")
 		}
@@ -340,11 +320,9 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 
 	endTime := time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("sql get table count total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("sql get table count total time: %v.\n", endTime.Sub(startTime).String())
 
-	_, err = engine.DB.Exec("use " + tableInfo.DbName)
+	_, err = engine.MySQLDB.Exec("use " + tableInfo.DbName)
 	if err != nil {
 		return tableInfo, fmt.Errorf("run SQL [%s] failed: %v", "use"+tableInfo.DbName, err)
 	}
@@ -359,7 +337,7 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 			SQL: query,
 		})
 		count := 0
-		err := queryRows(engine.DB, query, func(row, cols []string) error {
+		err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 			count++
 			return nil
 		})
@@ -373,7 +351,7 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 
 		step := totalRowCount / count
 		if step == 0 {
-			zlog.Logger.Warn("Split region", zap.String("warn", fmt.Sprintf("index [%s] of table [%s.%s] step is 0, can not probe index region range", idx.IndexName, tableInfo.DbName, tableInfo.TableName)))
+			log.Printf("split region: %v", zap.String("warn", fmt.Sprintf("index [%s] of table [%s.%s] step is 0, can not probe index region range.\n", idx.IndexName, tableInfo.DbName, tableInfo.TableName)))
 			continue
 		}
 
@@ -386,7 +364,7 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 		tableInfo.SQL = append(tableInfo.SQL, SqlInfo{
 			SQL: query,
 		})
-		if err = queryRows(engine.DB, query, func(row, cols []string) error {
+		if err = queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 			if cnt > 0 {
 				sqlBuf.WriteString(",")
 			}
@@ -406,9 +384,7 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("generate table split index region total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("generate table split index region total time: %v.\n", endTime.Sub(startTime).String())
 
 	// generate table data region range SQL
 	// show table regions include data region numbers and index region numbers
@@ -419,7 +395,7 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 	})
 
 	totalRegionCount := 0
-	err = queryRows(engine.DB, query, func(row, cols []string) error {
+	err = queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 
 		totalRegionCount++
 		return nil
@@ -446,7 +422,7 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 		SQL: query,
 	})
 
-	if err = queryRows(engine.DB, query, func(row, cols []string) error {
+	if err = queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		if cnt > 0 {
 			sqlBuf.WriteString(",")
 		}
@@ -465,9 +441,7 @@ func splitRangeTableOutputFile(engine *db.Engine, tableInfo TableInfo) (TableInf
 
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("generate table split data region total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("generate table split data region total time: %v.\n", endTime.Sub(startTime).String())
 
 	// SQL output flush to file
 	if err := fileWriter.Flush(); err != nil {

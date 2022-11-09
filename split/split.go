@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,12 +18,10 @@ package split
 import (
 	"database/sql"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
+	"github.com/wentaojin/tidba/util"
 	"os"
 	"time"
-
-	"github.com/wentaojin/tidba/pkg/db"
-
-	"github.com/wentaojin/tidba/pkg/util"
 )
 
 // Split table info
@@ -74,7 +72,7 @@ func initOrCreateDir(path string) error {
 }
 
 /*
-	Common db query
+Common db query
 */
 func queryRows(Engine *sql.DB, SQL string, fn func(row, cols []string) error) (err error) {
 	rows, err := Engine.Query(SQL)

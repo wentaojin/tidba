@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
+	"github.com/wentaojin/tidba/util"
+	"log"
 	"math"
 	"os"
 	"strings"
@@ -27,12 +30,6 @@ import (
 	"time"
 
 	"github.com/twotwotwo/sorts/sortutil"
-
-	"github.com/wentaojin/tidba/zlog"
-	"go.uber.org/zap"
-
-	"github.com/wentaojin/tidba/pkg/db"
-	"github.com/wentaojin/tidba/pkg/util"
 )
 
 func IncludeTableSplitEstimate(engine *db.Engine, dbName string, tableName string, columnName string, newDbName, newTableName, indexName string,
@@ -42,7 +39,7 @@ func IncludeTableSplitEstimate(engine *db.Engine, dbName string, tableName strin
 
 	includeTables = append(includeTables, tableName)
 
-	allTables, err := db.GetAllTables(dbName, engine)
+	allTables, err := engine.GetAllTables(dbName)
 	if err != nil {
 		return err
 	}
@@ -54,19 +51,12 @@ func IncludeTableSplitEstimate(engine *db.Engine, dbName string, tableName strin
 
 	tableInfo, err := runSplitTableEstimate(engine, dbName, tableName, columnName, newDbName, newTableName, indexName, estimateTableRows, estimateTableSize, regionSize, concurrency, outDir)
 	if err != nil {
-		zlog.Logger.Fatal("Task execute failed",
-			zap.Error(err),
-		)
+		return err
 	}
-	t, err := json.Marshal(tableInfo)
+	_, err = json.Marshal(tableInfo)
 	if err != nil {
-		zlog.Logger.Fatal("Task json table info struct failed",
-			zap.String("tableInfo", string(t)),
-		)
+		return err
 	}
-	zlog.Logger.Info("Task execute success",
-		zap.String("tableInfo", string(t)))
-
 	return nil
 }
 
@@ -127,7 +117,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	tableInfo.SQL = append(tableInfo.SQL, SqlInfo{
 		SQL: query,
 	})
-	if err := queryRows(engine.DB, query, func(row, cols []string) error {
+	if err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		var rows []string
 		for _, r := range row {
 			rows = append(rows, fmt.Sprintf(`'%s'`, r))
@@ -139,9 +129,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	}
 	endTime := time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("get table column all values total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("get table column all values total time: %v.\n", endTime.Sub(startTime).String())
 
 	// because sql not distinct, so need unique colsValue
 	var valueCols []string
@@ -151,9 +139,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	valueCols = colValues.SortList()
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("unique origin col values total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("unique origin col values total time: %v.\n", endTime.Sub(startTime).String())
 
 	// number of samples for each unique value
 	colCounts := math.Ceil(float64(estimateTableRows) / float64(len(valueCols)))
@@ -170,9 +156,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	// Less than 2048000, processed at once
 	if len(valueCols) <= concurrency {
 		// log record
-		zlog.Logger.Fatal("Run task info",
-			zap.String("appear error", fmt.Sprintf(`origin cols distinct value [%d] is not equal to concurrency value [%d], not need split region or reduce flag concurrency value`, len(valueCols), concurrency)),
-		)
+		log.Printf("appear error: %v", fmt.Sprintf(`origin cols distinct value [%d] is not equal to concurrency value [%d], not need split region or reduce flag concurrency value.\n`, len(valueCols), concurrency))
 	} else {
 		// split array
 		splitColsInfoNums = int(math.Ceil(float64(len(valueCols)) / float64(concurrency)))
@@ -186,9 +170,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	}
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("split origin cols value total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("split origin cols value total time: %v.\n", endTime.Sub(startTime).String())
 
 	// store column values include repeat
 	var (
@@ -217,9 +199,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	<-c
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("generate new cols total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("generate new cols total time: %v.\n", endTime.Sub(startTime).String())
 
 	newCols = s.Data
 
@@ -228,17 +208,13 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	sortutil.Strings(newCols)
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("sort new cols total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("sort new cols total time: %v.\n", endTime.Sub(startTime).String())
 
 	// determine whether the sorted value is equal to before
 	totalCols := len(valueCols) * int(colCounts)
 	if len(newCols) != totalCols {
 		// log record
-		zlog.Logger.Fatal("Run task info",
-			zap.String("appear error", fmt.Sprintf("sort new cols value [%d] is not equal to origin value [%d]", len(newCols), totalCols)),
-		)
+		log.Printf("appear error: %v", fmt.Sprintf("sort new cols value [%d] is not equal to origin value [%d]\n", len(newCols), totalCols))
 	}
 	// estimate split region numbers - counts
 	regionCounts := math.Ceil(float64(estimateTableSize) / float64(regionSize))
@@ -251,16 +227,15 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	splitNums := math.Ceil(float64(len(newCols)) / oneRegionStep)
 
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("distinct min value", valueCols[0]),
-		zap.String("distinct max value", valueCols[len(valueCols)-1]),
-		zap.Int("distinct value nums", len(valueCols)),
-		zap.Int("factor", int(colCounts)),
-		zap.Int("estimate rows", len(newCols)),
-		zap.Float64("estimate split region nums", regionCounts),
-		zap.Float64("one region rows", oneRegionStep),
-		zap.Float64("real split region nums", splitNums),
-	)
+	log.Printf("run task info, distinct min value [%s], distinct max value [%s], distinct value nums [%d], factor [%d], estimate rows [%d], estimate split region nums [%f], one region rows [%f], real split region nums [%f]",
+		valueCols[0],
+		valueCols[len(valueCols)-1],
+		len(valueCols),
+		int(colCounts),
+		len(newCols),
+		regionCounts,
+		oneRegionStep,
+		splitNums)
 
 	// split array
 	startTime = time.Now()
@@ -280,9 +255,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 	}
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("generate split info total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("generate split info total time: %v.\n", endTime.Sub(startTime).String())
 
 	// init file output dir and file write obj
 	if err := initOrCreateDir(tableInfo.OutDir); err != nil {
@@ -345,9 +318,7 @@ func splitEstimateTableRun(engine *db.Engine, dbName string, tableName string, c
 
 	endTime = time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("splicing sql text total time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("splicing sql text total time: %v.\n", endTime.Sub(startTime).String())
 
 	// SQL output flush to file
 	if err := fileWriter.Flush(); err != nil {

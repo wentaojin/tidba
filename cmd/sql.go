@@ -17,11 +17,10 @@ package cmd
 
 import (
 	"fmt"
-
-	"github.com/wentaojin/tidba/pkg/sql"
+	"github.com/wentaojin/tidba/db"
+	"github.com/wentaojin/tidba/sql"
 
 	"github.com/spf13/cobra"
-	"github.com/wentaojin/tidba/pkg/db"
 )
 
 // AppSQL is storage for the sub command analyze
@@ -64,7 +63,7 @@ func (app *AppSQL) RunE(cmd *cobra.Command, args []string) error {
 	if app.sqlFile == "" {
 		return fmt.Errorf("flag sql-file is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}

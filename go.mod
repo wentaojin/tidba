@@ -5,8 +5,8 @@ go 1.19
 require (
 	github.com/cheekybits/genny v1.0.0
 	github.com/go-sql-driver/mysql v1.5.0
-	github.com/jedib0t/go-pretty/v6 v6.4.0
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db
+	github.com/olekukonko/tablewriter v0.0.4
 	github.com/pingcap/errors v0.11.5-0.20201029093017-5a7df2af2ac7
 	github.com/pingcap/parser v0.0.0-20201120034941-782dfa0a1a9a
 	github.com/pingcap/tidb v1.1.0-beta.0.20201121130754-93c3e6becd59

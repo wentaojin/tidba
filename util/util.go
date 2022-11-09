@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -103,7 +103,7 @@ func Paginate(x []string, skip int, size int) []string {
 	return x[start():limit()]
 }
 
-//Int returns unique int values in a slice
+// Int returns unique int values in a slice
 func Int(slice []int) []int {
 	uMap := make(map[int]struct{})
 	result := []int{}
@@ -114,5 +114,46 @@ func Int(slice []int) []int {
 		result = append(result, key)
 	}
 	sort.Ints(result)
+	return result
+}
+
+func ArrayStringGroupsOf(arr []string, num int64) [][]string {
+	max := int64(len(arr))
+	//判断数组大小是否小于等于指定分割大小的值，是则把原数组放入二维数组返回
+	if max <= num {
+		return [][]string{arr}
+	}
+	//获取应该数组分割为多少份
+	var quantity int64
+	if max%num == 0 {
+		quantity = max / num
+	} else {
+		quantity = (max / num) + 1
+	}
+	//声明分割好的二维数组
+	var segments = make([][]string, 0)
+	//声明分割数组的截止下标
+	var start, end, i int64
+	for i = 1; i <= quantity; i++ {
+		end = i * num
+		if i != quantity {
+			segments = append(segments, arr[start:end])
+		} else {
+			segments = append(segments, arr[start:])
+		}
+		start = i * num
+	}
+	return segments
+}
+
+func RemoveDuplicateElement(languages []string) []string {
+	result := make([]string, 0, len(languages))
+	temp := map[string]struct{}{}
+	for _, item := range languages {
+		if _, ok := temp[item]; !ok {
+			temp[item] = struct{}{}
+			result = append(result, item)
+		}
+	}
 	return result
 }

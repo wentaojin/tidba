@@ -17,11 +17,10 @@ package cmd
 
 import (
 	"fmt"
-
-	"github.com/wentaojin/tidba/pkg/split"
+	"github.com/wentaojin/tidba/db"
+	split2 "github.com/wentaojin/tidba/split"
 
 	"github.com/spf13/cobra"
-	"github.com/wentaojin/tidba/pkg/db"
 )
 
 // AppSplit is storage for the sub command analyze
@@ -99,7 +98,7 @@ func (app *AppSplitRange) RunE(cmd *cobra.Command, args []string) error {
 	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
@@ -108,22 +107,22 @@ func (app *AppSplitRange) RunE(cmd *cobra.Command, args []string) error {
 	}
 
 	if app.all {
-		if err := split.AllTableSplitRange(app.dbName, app.Concurrency, app.outDir, engine); err != nil {
+		if err := split2.AllTableSplitRange(app.dbName, app.Concurrency, app.outDir, engine); err != nil {
 			return err
 		}
 	}
 
 	switch {
 	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "":
-		if err := split.IncludeTableSplitRange(app.dbName, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
+		if err := split2.IncludeTableSplitRange(app.dbName, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
 			return err
 		}
 	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "":
-		if err := split.FilterTableSplitRange(app.dbName, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
+		if err := split2.FilterTableSplitRange(app.dbName, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
 			return err
 		}
 	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "":
-		if err := split.RegexpTableSplitRange(app.dbName, app.Concurrency, app.regexTables, app.outDir, engine); err != nil {
+		if err := split2.RegexpTableSplitRange(app.dbName, app.Concurrency, app.regexTables, app.outDir, engine); err != nil {
 			return err
 		}
 	default:
@@ -167,9 +166,9 @@ func (app *AppSplitEstimate) Cmd() *cobra.Command {
 	cmd.Flags().IntVar(&app.estimateTableSize, "estimate-size", 0, "estimate need be split table size(M)")
 	cmd.Flags().StringVar(&app.estimateColumnName, "estimate-column", "", "configure sample base estimate table column name")
 	cmd.Flags().IntVar(&app.regionSize, "region-size", 96, "estimate need be split table region size(M)")
-	cmd.Flags().StringVar(&app.genDbName, "gen-dbname", "", "configure generate split table new db name through base estimate table column name")
-	cmd.Flags().StringVar(&app.genTableName, "gen-tableName", "", "configure generate split table new table name through base estimate table column name")
-	cmd.Flags().StringVar(&app.genIndexName, "gen-indexName", "", "configure generate split table index name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genDbName, "gen-db", "", "configure generate split table new db name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genTableName, "gen-table", "", "configure generate split table new table name through base estimate table column name")
+	cmd.Flags().StringVar(&app.genIndexName, "gen-index", "", "configure generate split table index name through base estimate table column name")
 
 	return cmd
 }
@@ -178,7 +177,7 @@ func (app *AppSplitEstimate) RunE(cmd *cobra.Command, args []string) error {
 	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
@@ -196,7 +195,7 @@ func (app *AppSplitEstimate) RunE(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("flag new index name is requirement, can not null")
 
 		}
-		if err := split.IncludeTableSplitEstimate(engine,
+		if err := split2.IncludeTableSplitEstimate(engine,
 			app.dbName,
 			app.includeTables[0],
 			app.estimateColumnName,
@@ -289,12 +288,12 @@ func (app *AppSplitSampling) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.baseDbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.baseDbName)
 	if err != nil {
 		return err
 	}
 
-	return split.GenerateSplitByBaseTable(engine,
+	return split2.GenerateSplitByBaseTable(engine,
 		app.baseDbName,
 		app.baseTableName,
 		app.baseIndexName,
@@ -374,12 +373,12 @@ func (app *AppSplitReckon) RunE(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.baseDbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.baseDbName)
 	if err != nil {
 		return err
 	}
 
-	return split.GenerateSplitByReckonBaseTable(engine,
+	return split2.GenerateSplitByReckonBaseTable(engine,
 		app.baseDbName,
 		app.baseTableName,
 		app.baseIndexName,
@@ -421,7 +420,7 @@ func (app *AppSplitKey) RunE(cmd *cobra.Command, args []string) error {
 	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
@@ -432,22 +431,22 @@ func (app *AppSplitKey) RunE(cmd *cobra.Command, args []string) error {
 	// get tidb server status port
 	statusAddr := fmt.Sprintf("%s:%d", app.host, app.tidbStatusPort)
 	if app.all {
-		if err := split.AllTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.outDir, engine); err != nil {
+		if err := split2.AllTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.outDir, engine); err != nil {
 			return err
 		}
 	}
 
 	switch {
 	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "":
-		if err := split.IncludeTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
+		if err := split2.IncludeTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
 			return err
 		}
 	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "":
-		if err := split.FilterTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
+		if err := split2.FilterTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.includeTables, app.outDir, engine); err != nil {
 			return err
 		}
 	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "":
-		if err := split.RegexpTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.regexTables, app.outDir, engine); err != nil {
+		if err := split2.RegexpTableSplitKey(app.dbName, statusAddr, app.Concurrency, app.regexTables, app.outDir, engine); err != nil {
 			return err
 		}
 	default:

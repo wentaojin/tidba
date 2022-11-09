@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,33 +21,29 @@ import (
 )
 
 type Engine struct {
-	DB *sql.DB
+	MySQLDB *sql.DB
 }
 
-func (e *Engine) QuerySQL(querySQL string) (cols []string, res []map[string]string, err error) {
-	return GeneralQuery(e.DB, querySQL)
+func (e *Engine) Query(querySQL string) (cols []string, res []map[string]string, err error) {
+	return Query(e.MySQLDB, querySQL)
 }
 
-type OperatorDB interface {
-	QuerySQL(querySQL string) (cols []string, res []map[string]string, err error)
-}
-
-// General query returns table field columns and corresponding field row data
-func GeneralQuery(db *sql.DB, querySQL string) ([]string, []map[string]string, error) {
+// query returns table field columns and corresponding field row data
+func Query(db *sql.DB, querySQL string) ([]string, []map[string]string, error) {
 	var (
 		cols []string
 		res  []map[string]string
 	)
 	rows, err := db.Query(querySQL)
 	if err != nil {
-		return cols, res, fmt.Errorf("error on general query SQL \n%v \nFailed: %v", querySQL, err.Error())
+		return cols, res, fmt.Errorf("error on general query sql \n%v \nFailed: %v", querySQL, err.Error())
 	}
 	defer rows.Close()
 
-	// indefinite field general query,get field names automatically
+	// indefinite field query,get field names automatically
 	cols, err = rows.Columns()
 	if err != nil {
-		return cols, res, fmt.Errorf("error on general query rows.Columns failed: %v", err.Error())
+		return cols, res, fmt.Errorf("error on query rows.Columns failed: %v", err.Error())
 	}
 
 	values := make([][]byte, len(cols))
@@ -59,7 +55,7 @@ func GeneralQuery(db *sql.DB, querySQL string) ([]string, []map[string]string, e
 	for rows.Next() {
 		err = rows.Scan(scans...)
 		if err != nil {
-			return cols, res, fmt.Errorf("error on general query rows.Scan failed: %v", err.Error())
+			return cols, res, fmt.Errorf("error on query rows.Scan failed: %v", err.Error())
 		}
 
 		row := make(map[string]string)

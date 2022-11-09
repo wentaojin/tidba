@@ -17,12 +17,11 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/wentaojin/tidba/db"
+	"github.com/wentaojin/tidba/table"
 	"time"
 
-	"github.com/wentaojin/tidba/pkg/table"
-
 	"github.com/spf13/cobra"
-	"github.com/wentaojin/tidba/pkg/db"
 )
 
 // AppTable is storage for the sub command analyze
@@ -107,7 +106,7 @@ func (app *AppTableAnalyze) RunE(cmd *cobra.Command, args []string) error {
 	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
@@ -183,7 +182,7 @@ func (app *AppTableRegion) RunE(cmd *cobra.Command, args []string) error {
 	if app.dbName == "" {
 		return fmt.Errorf("flag db name is requirement, can not null")
 	}
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}
@@ -219,15 +218,87 @@ func (app *AppTableRegion) RunE(cmd *cobra.Command, args []string) error {
 		if err := table.IncludeTableRegionIndexView(app.dbName, app.Concurrency, app.includeTables, app.indexName, engine); err != nil {
 			return err
 		}
+	default:
+		if err := cmd.Help(); err != nil {
+			return err
+		}
+	}
 
-	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "" && app.indexName != nil:
-		if err := table.FilterTableRegionIndexView(app.dbName, app.Concurrency, app.excludeTables, app.indexName, engine); err != nil {
+	return nil
+}
+
+/*
+	Table data or index region hotspot top distribution
+*/
+// includeTable、excludeTable、regexTable only one of the three
+type AppTableHotspot struct {
+	*AppTable
+	hotType   string
+	limit     int
+	indexName []string
+}
+
+// is a method of App that returns a Cmder instance for the sub command
+func (app *AppTable) AppTableHotspot() Cmder {
+	return &AppTableHotspot{AppTable: app}
+}
+
+// Cmd returns a cobra.Command instance to be added to the parent command
+func (app *AppTableHotspot) Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:          "hotspot",
+		Short:        "View table data or index region hotspot top distribution",
+		Long:         `View table data or index region hotspot top distribution`,
+		RunE:         app.RunE,
+		SilenceUsage: true,
+	}
+	cmd.Flags().StringVarP(&app.hotType, "hottype", "t", "read", "configure view hotspot type (read/write)")
+	cmd.Flags().IntVarP(&app.limit, "limit", "l", 10, "configure view hotspot top limit")
+	cmd.Flags().StringSliceVar(&app.indexName, "index", nil, "configure table index name")
+
+	return cmd
+}
+
+// RunE is a main routine of the sub command, returning a nil
+func (app *AppTableHotspot) RunE(cmd *cobra.Command, args []string) error {
+	if app.dbName == "" {
+		return fmt.Errorf("flag db name is requirement, can not null")
+	}
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.dbName)
+	if err != nil {
+		return err
+	}
+	if !engine.IsExistDbName(app.dbName) {
+		return err
+	}
+
+	if app.all {
+		if err := table.AllTableDataAndIndexRegionHotspotView(app.dbName, app.hotType, app.limit, engine); err != nil {
 			return err
 		}
-	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "" && app.indexName != nil:
-		if err := table.RegexpTableRegionIndexView(app.dbName, app.Concurrency, app.regexTables, app.indexName, engine); err != nil {
+		return nil
+	}
+	switch {
+	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "" && app.indexName == nil:
+		if err := table.IncludeTableDataRegionHotspotView(app.dbName, app.hotType, app.limit, app.Concurrency, app.includeTables, engine); err != nil {
 			return err
 		}
+
+	case app.includeTables == nil && app.excludeTables != nil && app.regexTables == "" && app.indexName == nil:
+		if err := table.FilterTableDataRegionHotspotView(app.dbName, app.hotType, app.limit, app.Concurrency, app.excludeTables, engine); err != nil {
+			return err
+		}
+
+	case app.includeTables == nil && app.excludeTables == nil && app.regexTables != "" && app.indexName == nil:
+		if err := table.RegexpTableDataRegionHotspotView(app.dbName, app.hotType, app.limit, app.Concurrency, app.regexTables, engine); err != nil {
+			return err
+		}
+
+	case app.includeTables != nil && app.excludeTables == nil && app.regexTables == "" && app.indexName != nil:
+		if err := table.IncludeTableIndexRegionHotspotView(app.dbName, app.hotType, app.limit, app.Concurrency, app.includeTables, app.indexName, engine); err != nil {
+			return err
+		}
+
 	default:
 		if err := cmd.Help(); err != nil {
 			return err

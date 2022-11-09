@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,14 +19,12 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
+	"github.com/wentaojin/tidba/util"
 	"io/ioutil"
 	"os"
 	"path"
 	"strings"
-
-	"github.com/wentaojin/tidba/pkg/util"
-
-	"github.com/wentaojin/tidba/pkg/db"
 )
 
 type sqlRun struct {
@@ -65,7 +63,7 @@ func RunSQL(engine *db.Engine, sqlFile, sqlSeparator, outDir string) error {
 		if _, err := s.fileWriter.WriteString(sqlBuf.String() + "\n"); err != nil {
 			return err
 		}
-		cols, res, err := engine.QuerySQL(sql)
+		cols, res, err := engine.Query(sql)
 		if err != nil {
 			return err
 		}

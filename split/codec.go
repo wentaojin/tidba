@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,6 +19,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
 	"io/ioutil"
 	"net/http"
 	"strconv"
@@ -35,8 +36,6 @@ import (
 	"github.com/pingcap/tidb/table/tables"
 	"github.com/pingcap/tidb/tablecodec"
 	"github.com/pingcap/tidb/types"
-
-	"github.com/wentaojin/tidba/pkg/db"
 )
 
 func decodeKeyFromString(s, statusAddr string, loc *time.Location) (string, error) {
@@ -97,13 +96,13 @@ func getTableInfoSchema(statusAddr string, tableID int64) (string, error) {
 
 func getSessionLocation(engine *db.Engine) (*time.Location, error) {
 	query := `show variables  where Variable_name="time_zone"`
-	_, res, err := engine.QuerySQL(query)
+	_, res, err := engine.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("run SQL [%s] failed: %v", query, err)
 	}
 	if res[0]["VALUE"] == "SYSTEM" {
 		query = `show variables where Variable_name="system_time_zone"`
-		_, r, err := engine.QuerySQL(query)
+		_, r, err := engine.Query(query)
 		if err != nil {
 			return nil, fmt.Errorf("run SQL [%s] failed: %v", query, err)
 		}

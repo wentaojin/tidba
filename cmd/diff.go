@@ -17,13 +17,9 @@ package cmd
 
 import (
 	"fmt"
-
-	"github.com/wentaojin/tidba/zlog"
-	"go.uber.org/zap"
-
-	"github.com/wentaojin/tidba/pkg/diff"
-
 	"github.com/spf13/cobra"
+	"github.com/wentaojin/tidba/diff"
+	"log"
 )
 
 // AppDiff is storage for the sub command analyze
@@ -96,8 +92,7 @@ func (app *AppDiffPD) RunE(cmd *cobra.Command, args []string) error {
 
 	err := diff.ComponentPDDiff(app.basePDAddr, app.comparePDAddr, app.format, app.coloring, app.quiet)
 	if err != nil && err == diff.Equivalent {
-		zlog.Logger.Info("Task run success", zap.String("equivalent",
-			fmt.Sprintf(`the pd components on both sides of [%s] and [%s] have the same configuration,so you can skip the check`, app.basePDAddr, app.comparePDAddr)))
+		log.Printf(`the pd components on both sides of [%s] and [%s] have the same configuration,so you can skip the check.\n`, app.basePDAddr, app.comparePDAddr)
 	} else {
 		return err
 	}
@@ -153,8 +148,7 @@ func (app *AppDiffTiDB) RunE(cmd *cobra.Command, args []string) error {
 	err := diff.ComponentTiDBDiff(app.baseTiDBAddr, app.baseTiDBUser, app.baseTiDBPassword, app.compareTiDBAddr,
 		app.compareTiDBUser, app.compareTiDBPassword, app.diffType, app.format, app.coloring, app.quiet)
 	if err != nil && err == diff.Equivalent {
-		zlog.Logger.Info("Task run success", zap.String("equivalent",
-			fmt.Sprintf(`the tidb components on both sides of [%s] and [%s] have the same configuration,so you can skip the check`, app.baseTiDBAddr, app.compareTiDBAddr)))
+		log.Printf(`the tidb components on both sides of [%s] and [%s] have the same configuration,so you can skip the check.\n`, app.baseTiDBAddr, app.compareTiDBAddr)
 	} else {
 		return err
 	}
@@ -219,16 +213,14 @@ func (app *AppDiffTiKV) RunE(cmd *cobra.Command, args []string) error {
 	case app.baseTiKVAddr != "" && app.compareTiKVAddr != "":
 		err := diff.ComponentTiKVDiffByAPI(app.baseTiKVAddr, app.compareTiKVAddr, app.format, app.coloring, app.quiet)
 		if err != nil && err == diff.Equivalent {
-			zlog.Logger.Info("Task run success", zap.String("equivalent",
-				fmt.Sprintf(`the tikv components on both sides of [%s] and [%s] have the same configuration,so you can skip the check`, app.baseTiKVAddr, app.compareTiKVAddr)))
+			log.Printf(`the tikv components on both sides of [%s] and [%s] have the same configuration,so you can skip the check.\n`, app.baseTiKVAddr, app.compareTiKVAddr)
 		} else {
 			return err
 		}
 	case app.baseTiKVJsonFile != "" && app.compareTiKVAddr != "":
 		err := diff.ComponentTiKVDiffByJSON(app.baseTiKVJsonFile, app.compareTiKVAddr, app.format, app.coloring, app.quiet)
 		if err != nil && err == diff.Equivalent {
-			zlog.Logger.Info("Task run success", zap.String("equivalent",
-				fmt.Sprintf(`the tikv components on both sides of [%s] and [%s] have the same configuration,so you can skip the check`, app.baseTiKVJsonFile, app.compareTiKVAddr)))
+			log.Printf(`the tikv components on both sides of [%s] and [%s] have the same configuration,so you can skip the check.\n`, app.baseTiKVJsonFile, app.compareTiKVAddr)
 		} else {
 			return err
 		}

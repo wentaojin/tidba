@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,16 +18,14 @@ package split
 import (
 	"bytes"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
+	"log"
 	"math"
 	"path"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/wentaojin/tidba/pkg/db"
-	"github.com/wentaojin/tidba/zlog"
-	"go.uber.org/zap"
 )
 
 func GenerateSplitByReckonBaseTable(engine *db.Engine, baseDB, baseTable, baseIndex, newDB, newTable, newIndex, outDir string, totalWriteRows int) error {
@@ -78,9 +76,7 @@ func GenerateSplitByReckonBaseTable(engine *db.Engine, baseDB, baseTable, baseIn
 
 	s.close()
 	endTime := time.Now()
-	zlog.Logger.Info("Run task info",
-		zap.String("generate split table sql total cost time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("generate split table sql total cost time: %v.\n", endTime.Sub(startTime).String())
 	return nil
 }
 
@@ -90,7 +86,7 @@ func (s *splitByBase) getBaseTableDistinctCounts(engine *db.Engine) (int, error)
 	query := fmt.Sprintf("select count(distinct %s) from %s order by %s",
 		idxCols, s.tableName(s.baseDB, s.baseTable), idxCols)
 	count := 0
-	if err := queryRows(engine.DB, query, func(row, cols []string) error {
+	if err := queryRows(engine.MySQLDB, query, func(row, cols []string) error {
 		if len(row) == 0 {
 			return fmt.Errorf(fmt.Sprintf("get base table [%s] distinct counts falied", s.baseTable))
 		}
@@ -105,9 +101,7 @@ func (s *splitByBase) getBaseTableDistinctCounts(engine *db.Engine) (int, error)
 	}
 	endTime := time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("get base table distinct counts", endTime.Sub(startTime).String()),
-	)
+	log.Printf("get base table distinct counts: %v.\n", endTime.Sub(startTime).String())
 
 	return count, nil
 }
@@ -146,16 +140,14 @@ FROM
 WHERE
 	RowNumber %% %[3]d = 1`, idxCols, s.tableName(s.baseDB, s.baseTable), int(step))
 
-	rows, err := queryAllRows(engine.DB, query)
+	rows, err := queryAllRows(engine.MySQLDB, query)
 	if err != nil {
 		return err
 	}
 	s.distinctValues = rows
 	endTime := time.Now()
 	// log record
-	zlog.Logger.Info("Run task info",
-		zap.String("get split region demarcation point by paginate sql cost time", endTime.Sub(startTime).String()),
-	)
+	log.Printf("get split region demarcation point by paginate sql cost time: %v.\n", endTime.Sub(startTime).String())
 
 	for i, values := range s.distinctValues {
 		if i > 0 {

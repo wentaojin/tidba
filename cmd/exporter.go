@@ -17,8 +17,8 @@ package cmd
 
 import (
 	"github.com/spf13/cobra"
-	"github.com/wentaojin/tidba/pkg/db"
-	"github.com/wentaojin/tidba/pkg/exporter"
+	"github.com/wentaojin/tidba/db"
+	"github.com/wentaojin/tidba/exporter"
 )
 
 // AppExporter
@@ -93,7 +93,7 @@ func (app *AppExporterUser) Cmd() *cobra.Command {
 }
 
 func (app *AppExporterUser) RunE(cmd *cobra.Command, args []string) error {
-	engine, err := db.NewMysqlDSN(app.user, app.password, app.host, app.port, app.dbName)
+	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, app.dbName)
 	if err != nil {
 		return err
 	}

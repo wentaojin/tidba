@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-   http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,6 +23,10 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 )
+
+func QueryResultFormatTableWithRowLineStyle(cols []string, data [][]string) {
+	NewTable(os.Stdout).TableWithRowLineStyle(cols, data)
+}
 
 func QueryResultFormatTableWithBaseStyle(cols []string, res []map[string]string) {
 	header, data := QueryResultProcess(cols, res)
@@ -67,6 +71,18 @@ func (t *Table) TableWithBaseStyle(header []string, data [][]string) {
 	t.SetHeader(header)
 	t.SetAutoWrapText(false)
 	t.SetAutoFormatHeaders(false)
+	t.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
+	for _, v := range data {
+		t.Append(v)
+	}
+	t.Render() // Send output
+}
+
+func (t *Table) TableWithRowLineStyle(header []string, data [][]string) {
+	t.SetHeader(header)
+	t.SetAutoWrapText(false)
+	t.SetAutoFormatHeaders(false)
+	t.SetRowLine(true)
 	t.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	for _, v := range data {
 		t.Append(v)

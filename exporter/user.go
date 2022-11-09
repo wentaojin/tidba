@@ -5,7 +5,7 @@ Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
 You may obtain a copy of the License at
 
-    http://www.apache.org/licenses/LICENSE-2.0
+	http://www.apache.org/licenses/LICENSE-2.0
 
 Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,16 +20,12 @@ import (
 	"bytes"
 	"database/sql"
 	"fmt"
+	"github.com/wentaojin/tidba/db"
+	"github.com/wentaojin/tidba/util"
 	"os"
 	"path"
 	"strings"
 	"time"
-
-	"github.com/wentaojin/tidba/zlog"
-	"go.uber.org/zap"
-
-	"github.com/wentaojin/tidba/pkg/db"
-	"github.com/wentaojin/tidba/pkg/util"
 )
 
 type exporterByUser struct {
@@ -73,7 +69,7 @@ WHERE
 
 	var users []string
 
-	_, res, err := engine.QuerySQL(querySQL)
+	_, res, err := engine.Query(querySQL)
 	if err != nil {
 		return users, fmt.Errorf("failed get all username from db: %v", err)
 	}
@@ -110,7 +106,7 @@ FROM
 WHERE
 	USER IN (%s)`, username)
 	}
-	_, res, err := engine.QuerySQL(querySQL)
+	_, res, err := engine.Query(querySQL)
 	if err != nil {
 		return fmt.Errorf("failed get username create sql from db: %v", err)
 	}
@@ -151,7 +147,7 @@ FROM
 WHERE
 	USER IN (%s)`, username)
 
-	_, res, err := engine.QuerySQL(querySQL)
+	_, res, err := engine.Query(querySQL)
 	if err != nil {
 		return fmt.Errorf("failed get username grants for sql from db: %v", err)
 	}
@@ -166,7 +162,7 @@ WHERE
 func (s *exporterByUser) generateUserGrantsSQL(engine *db.Engine) error {
 	for _, grantSQL := range s.grantsForSQL {
 		var userGrant []string
-		if err := queryRows(engine.DB, grantSQL, func(row, cols []string) error {
+		if err := queryRows(engine.MySQLDB, grantSQL, func(row, cols []string) error {
 			userGrant = append(userGrant, fmt.Sprintf("%s;", row[0]))
 			return nil
 		}); err != nil {
@@ -227,9 +223,7 @@ func IncludeUserExporter(clusterVersion int, includeUsers []string, outDir strin
 	}
 	s.close()
 	endTime := time.Now()
-	zlog.Logger.Info("Run task info",
-		zap.String("exporter user create and grants sql total cost time", endTime.Sub(startTime).String()),
-	)
+	fmt.Printf("exporter user create and grants sql total cost time: %v.\n", endTime.Sub(startTime).String())
 	return nil
 }
 
@@ -257,9 +251,8 @@ func FilterUserExporter(clusterVersion int, excludeTables []string, outDir strin
 	}
 	s.close()
 	endTime := time.Now()
-	zlog.Logger.Info("Run task info",
-		zap.String("exporter user create and grants sql total cost time", endTime.Sub(startTime).String()),
-	)
+
+	fmt.Printf("exporter user create and grants sql total cost time: %v.\n", endTime.Sub(startTime).String())
 	return nil
 }
 
@@ -287,9 +280,7 @@ func RegexpUserExporter(clusterVersion int, regex string, outDir string, engine 
 	}
 	s.close()
 	endTime := time.Now()
-	zlog.Logger.Info("Run task info",
-		zap.String("exporter user create and grants sql total cost time", endTime.Sub(startTime).String()),
-	)
+	fmt.Printf("exporter user create and grants sql total cost time: %v.\n", endTime.Sub(startTime).String())
 	return nil
 }
 
@@ -316,9 +307,7 @@ func AllUserExporter(clusterVersion int, outDir string, engine *db.Engine) error
 	}
 	s.close()
 	endTime := time.Now()
-	zlog.Logger.Info("Run task info",
-		zap.String("exporter user create and grants sql total cost time", endTime.Sub(startTime).String()),
-	)
+	fmt.Printf("exporter user create and grants sql total cost time: %v.\n", endTime.Sub(startTime).String())
 	return nil
 }
 
