@@ -24,6 +24,8 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
+	"time"
 )
 
 type Region struct {
@@ -72,6 +74,40 @@ type ConfigReplica struct {
 	EnablePlacementRules      string `json:"enable-placement-rules"`
 	EnablePlacementRulesCache string `json:"enable-placement-rules-cache"`
 	IsolationLevel            string `json:"isolation-level"`
+}
+
+type Store struct {
+	Count  int `json:"count"`
+	Stores []struct {
+		Store struct {
+			ID             int    `json:"id"`
+			Address        string `json:"address"`
+			Version        string `json:"version"`
+			StatusAddress  string `json:"status_address"`
+			GitHash        string `json:"git_hash"`
+			StartTimestamp int    `json:"start_timestamp"`
+			DeployPath     string `json:"deploy_path"`
+			LastHeartbeat  int64  `json:"last_heartbeat"`
+			StateName      string `json:"state_name"`
+		} `json:"store"`
+		Status struct {
+			Capacity        string    `json:"capacity"`
+			Available       string    `json:"available"`
+			UsedSize        string    `json:"used_size"`
+			LeaderCount     int       `json:"leader_count"`
+			LeaderWeight    int       `json:"leader_weight"`
+			LeaderScore     int       `json:"leader_score"`
+			LeaderSize      int       `json:"leader_size"`
+			RegionCount     int       `json:"region_count"`
+			RegionWeight    int       `json:"region_weight"`
+			RegionScore     int       `json:"region_score"`
+			RegionSize      int       `json:"region_size"`
+			SlowScore       int       `json:"slow_score"`
+			StartTs         time.Time `json:"start_ts"`
+			LastHeartbeatTs time.Time `json:"last_heartbeat_ts"`
+			Uptime          string    `json:"uptime"`
+		} `json:"status"`
+	} `json:"stores"`
 }
 
 func GetCurrentRegionPeer(peers string, regionType, pdAddr string, engine *db.Engine) error {
@@ -154,8 +190,15 @@ func GetCurrentRegionPeer(peers string, regionType, pdAddr string, engine *db.En
 	return nil
 }
 
-func GetMajorDownRegionPeer(regionType, pdAddr string, downStores []int, engine *db.Engine) error {
-	region, err := getClusterAllRegion(pdAddr)
+func GetMajorDownRegionPeer(regionType, pdAddr string, downTiKVS []string, engine *db.Engine) error {
+	var (
+		data        [][]string
+		regionID    []string
+		downStores  []int
+		panicStores []string
+	)
+
+	region, err := getClusterDownRegion(pdAddr)
 	if err != nil {
 		return err
 	}
@@ -163,11 +206,25 @@ func GetMajorDownRegionPeer(regionType, pdAddr string, downStores []int, engine 
 	if err != nil {
 		return err
 	}
+	stores, err := getClusterStores(pdAddr)
+	if err != nil {
+		return err
+	}
 
-	var (
-		data     [][]string
-		regionID []string
-	)
+	for _, t := range downTiKVS {
+		for _, s := range stores.Stores {
+			if strings.EqualFold(t, s.Store.Address) && strings.EqualFold(s.Store.StateName, "DOWN") {
+				downStores = append(downStores, s.Store.ID)
+			} else {
+				panicStores = append(panicStores, t)
+			}
+		}
+	}
+
+	if len(panicStores) > 0 {
+		return fmt.Errorf("down tikv [%v] isn't exist, please again check", panicStores)
+	}
+
 	tmpRegionMap := make(map[string][]string)
 
 	fmt.Printf(">--------+  Region Count: %v  +--------<\n", region.Count)
@@ -239,8 +296,16 @@ func GetMajorDownRegionPeer(regionType, pdAddr string, downStores []int, engine 
 	return nil
 }
 
-func GetLessDownRegionPeer(regionType, pdAddr string, downStores []int, engine *db.Engine) error {
-	region, err := getClusterAllRegion(pdAddr)
+func GetLessDownRegionPeer(regionType, pdAddr string, downTiKVS []string, engine *db.Engine) error {
+	var (
+		data              [][]string
+		regionID          []string
+		downStores        []int
+		panicStores       []string
+		downRegionIDStore []string
+	)
+
+	region, err := getClusterDownRegion(pdAddr)
 	if err != nil {
 		return err
 	}
@@ -248,12 +313,25 @@ func GetLessDownRegionPeer(regionType, pdAddr string, downStores []int, engine *
 	if err != nil {
 		return err
 	}
+	stores, err := getClusterStores(pdAddr)
+	if err != nil {
+		return err
+	}
 
-	var (
-		data              [][]string
-		regionID          []string
-		downRegionIDStore []string
-	)
+	for _, t := range downTiKVS {
+		for _, s := range stores.Stores {
+			if strings.EqualFold(t, s.Store.Address) && strings.EqualFold(s.Store.StateName, "DOWN") {
+				downStores = append(downStores, s.Store.ID)
+			} else {
+				panicStores = append(panicStores, t)
+			}
+		}
+	}
+
+	if len(panicStores) > 0 {
+		return fmt.Errorf("down tikv [%v] isn't exist, please again check", panicStores)
+	}
+
 	tmpRegionMap := make(map[string][]string)
 
 	fmt.Printf(">--------+  Region Count: %v  +--------<\n", region.Count)
@@ -374,10 +452,30 @@ func GetRegionIDINFO(regionID []string, regionType, pdAddr string, engine *db.En
 	}
 	return nil
 }
+
 func getClusterAllRegion(pdAddr string) (Region, error) {
 	var region Region
 
 	regionAPI := fmt.Sprintf("http://%s/pd/api/v1/regions", pdAddr)
+	response, err := http.Get(regionAPI)
+	if err != nil {
+		return region, fmt.Errorf("http curl request get failed: %v", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return region, fmt.Errorf("read request data failed: %v", err)
+	}
+	if err := json.Unmarshal(body, &region); err != nil {
+		return region, fmt.Errorf("json Unmarshal struct region failed: %v", err)
+	}
+	return region, nil
+}
+
+func getClusterDownRegion(pdAddr string) (Region, error) {
+	var region Region
+
+	regionAPI := fmt.Sprintf("http://%s/pd/api/v1/regions/check/down-peer", pdAddr)
 	response, err := http.Get(regionAPI)
 	if err != nil {
 		return region, fmt.Errorf("http curl request get failed: %v", err)
@@ -428,4 +526,23 @@ func getClusterSingleRegion(pdAddr string, regionID string) (SingleRegion, error
 		return region, fmt.Errorf("json Unmarshal struct region failed: %v", err)
 	}
 	return region, nil
+}
+
+func getClusterStores(pdAddr string) (Store, error) {
+	var store Store
+
+	storeAPI := fmt.Sprintf("http://%s/pd/api/v1/stores", pdAddr)
+	response, err := http.Get(storeAPI)
+	if err != nil {
+		return store, fmt.Errorf("http curl request get failed: %v", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return store, fmt.Errorf("read request data failed: %v", err)
+	}
+	if err := json.Unmarshal(body, &store); err != nil {
+		return store, fmt.Errorf("json Unmarshal struct region failed: %v", err)
+	}
+	return store, nil
 }

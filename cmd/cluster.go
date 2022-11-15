@@ -71,7 +71,7 @@ type AppClusterRegion struct {
 	pdAddr      string
 	regionType  string
 	replicaType string
-	downStores  []int
+	downTiKVS   []string
 }
 
 // is a method of App that returns a Cmder instance for the sub command
@@ -93,7 +93,7 @@ func (app *AppClusterRegion) Cmd() *cobra.Command {
 	cmd.Flags().StringVar(&app.pdAddr, "pdAddr", "127.0.0.1:2379", "configure cluster pd addr")
 	cmd.Flags().StringVar(&app.regionType, "regiontype", "all", "configure cluster region type (data/index/all)")
 	cmd.Flags().StringVar(&app.replicaType, "replicatype", "", "configure cluster region replica problem type (majorDown/lessDown)")
-	cmd.Flags().IntSliceVarP(&app.downStores, "downstore", "s", nil, "configure store id")
+	cmd.Flags().StringSliceVarP(&app.downTiKVS, "downtikv", "s", nil, "configure tikv addr (tikvIP:servicePort)")
 	return cmd
 }
 
@@ -105,22 +105,22 @@ func (app *AppClusterRegion) RunE(cmd *cobra.Command, args []string) error {
 	}
 
 	switch {
-	case app.peers != "" && app.downStores == nil && app.replicaType == "":
+	case app.peers != "" && app.downTiKVS == nil && app.replicaType == "":
 		if err := cluster.GetCurrentRegionPeer(app.peers, app.regionType, app.pdAddr, engine); err != nil {
 			return err
 		}
 
-	case app.downStores != nil && app.peers == "" && strings.EqualFold(app.replicaType, "majorDown"):
-		if err := cluster.GetMajorDownRegionPeer(app.regionType, app.pdAddr, app.downStores, engine); err != nil {
+	case app.downTiKVS != nil && app.peers == "" && strings.EqualFold(app.replicaType, "majorDown"):
+		if err := cluster.GetMajorDownRegionPeer(app.regionType, app.pdAddr, app.downTiKVS, engine); err != nil {
 			return err
 		}
 
-	case app.downStores != nil && app.peers == "" && strings.EqualFold(app.replicaType, "lessDown"):
-		if err := cluster.GetLessDownRegionPeer(app.regionType, app.pdAddr, app.downStores, engine); err != nil {
+	case app.downTiKVS != nil && app.peers == "" && strings.EqualFold(app.replicaType, "lessDown"):
+		if err := cluster.GetLessDownRegionPeer(app.regionType, app.pdAddr, app.downTiKVS, engine); err != nil {
 			return err
 		}
 
-	case app.regionID != nil && app.downStores == nil && app.peers == "" && app.replicaType == "" && app.regionType == "all":
+	case app.regionID != nil && app.downTiKVS == nil && app.peers == "" && app.replicaType == "" && app.regionType == "all":
 		if err := cluster.GetRegionIDINFO(app.regionID, app.regionType, app.pdAddr, engine); err != nil {
 			return err
 		}
