@@ -21,94 +21,12 @@ import (
 	"github.com/tidwall/pretty"
 	"github.com/wentaojin/tidba/db"
 	"github.com/wentaojin/tidba/util"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 )
-
-type Region struct {
-	Count   int            `json:"count"`
-	Regions []SingleRegion `json:"regions"`
-}
-
-type SingleRegion struct {
-	ID       int    `json:"id"`
-	StartKey string `json:"start_key"`
-	EndKey   string `json:"end_key"`
-	Epoch    struct {
-		ConfVer int `json:"conf_ver"`
-		Version int `json:"version"`
-	} `json:"epoch"`
-	Peers []struct {
-		ID       int    `json:"id"`
-		StoreID  int    `json:"store_id"`
-		RoleName string `json:"role_name"`
-	} `json:"peers"`
-	Leader struct {
-		ID       int    `json:"id"`
-		StoreID  int    `json:"store_id"`
-		RoleName string `json:"role_name"`
-	} `json:"leader"`
-	WrittenBytes    int      `json:"written_bytes"`
-	ReadBytes       int      `json:"read_bytes"`
-	WrittenKeys     int      `json:"written_keys"`
-	ReadKeys        int      `json:"read_keys"`
-	ApproximateSize int      `json:"approximate_size"`
-	ApproximateKeys int      `json:"approximate_keys"`
-	DBINFO          []DBINFO `json:"db_info"`
-}
-
-type DBINFO struct {
-	RegionID  string `json:"region_id"`
-	DBName    string `json:"db_name"`
-	TableName string `json:"table_name"`
-	IndexName string `json:"index_name"`
-}
-
-type ConfigReplica struct {
-	MaxReplicas               int    `json:"max-replicas"`
-	LocationLabels            string `json:"location-labels"`
-	StrictlyMatchLabel        string `json:"strictly-match-label"`
-	EnablePlacementRules      string `json:"enable-placement-rules"`
-	EnablePlacementRulesCache string `json:"enable-placement-rules-cache"`
-	IsolationLevel            string `json:"isolation-level"`
-}
-
-type Store struct {
-	Count  int `json:"count"`
-	Stores []struct {
-		Store struct {
-			ID             int    `json:"id"`
-			Address        string `json:"address"`
-			Version        string `json:"version"`
-			StatusAddress  string `json:"status_address"`
-			GitHash        string `json:"git_hash"`
-			StartTimestamp int    `json:"start_timestamp"`
-			DeployPath     string `json:"deploy_path"`
-			LastHeartbeat  int64  `json:"last_heartbeat"`
-			StateName      string `json:"state_name"`
-		} `json:"store"`
-		Status struct {
-			Capacity        string    `json:"capacity"`
-			Available       string    `json:"available"`
-			UsedSize        string    `json:"used_size"`
-			LeaderCount     int       `json:"leader_count"`
-			LeaderWeight    int       `json:"leader_weight"`
-			LeaderScore     int       `json:"leader_score"`
-			LeaderSize      int       `json:"leader_size"`
-			RegionCount     int       `json:"region_count"`
-			RegionWeight    int       `json:"region_weight"`
-			RegionScore     int       `json:"region_score"`
-			RegionSize      int       `json:"region_size"`
-			SlowScore       int       `json:"slow_score"`
-			StartTs         time.Time `json:"start_ts"`
-			LastHeartbeatTs time.Time `json:"last_heartbeat_ts"`
-			Uptime          string    `json:"uptime"`
-		} `json:"status"`
-	} `json:"stores"`
-}
 
 func GetCurrentRegionPeer(peers string, regionType, pdAddr string, engine *db.Engine) error {
 	region, err := getClusterAllRegion(pdAddr)
@@ -190,12 +108,10 @@ func GetCurrentRegionPeer(peers string, regionType, pdAddr string, engine *db.En
 	return nil
 }
 
-func GetMajorDownRegionPeer(regionType, pdAddr string, downTiKVS []string, engine *db.Engine) error {
+func GetMajorDownRegionPeerByDownTiKVS(regionType, pdAddr string, concurrency int, downTiKVS []string, engine *db.Engine) error {
 	var (
-		data        [][]string
-		regionID    []string
-		downStores  []int
-		panicStores []string
+		data       [][]string
+		downStores []int
 	)
 
 	region, err := getClusterDownRegion(pdAddr)
@@ -215,64 +131,102 @@ func GetMajorDownRegionPeer(regionType, pdAddr string, downTiKVS []string, engin
 		for _, s := range stores.Stores {
 			if strings.EqualFold(t, s.Store.Address) && strings.EqualFold(s.Store.StateName, "DOWN") {
 				downStores = append(downStores, s.Store.ID)
-			} else {
-				panicStores = append(panicStores, t)
 			}
 		}
 	}
 
-	if len(panicStores) > 0 {
-		return fmt.Errorf("down tikv [%v] isn't exist, please again check", panicStores)
+	if len(downStores) != len(downTiKVS) {
+		return fmt.Errorf("down tikv [%v] isn't exist, please again check down store [%v]", downTiKVS, downStores)
 	}
 
-	tmpRegionMap := make(map[string][]string)
+	fmt.Printf(">--------+  Cluster Replica Count: %v  +--------<\n", cfgReplica.MaxReplicas)
+	fmt.Printf(">--------+  Down Region Count: %v  +--------<\n", region.Count)
+	fmt.Println(">--------+  Scan Doing: Please Waiting  +--------<")
 
-	fmt.Printf(">--------+  Region Count: %v  +--------<\n", region.Count)
-	fmt.Printf(">--------+  Replica Count: %v  +--------<\n", cfgReplica.MaxReplicas)
-	columns := []string{"RegionID", "LeaderID", "Peers", "ApproximateSize", "ApproximateKeys", "Category"}
-	for _, r := range region.Regions {
-		// 获取异常 Region
-		var downRegionArr []int
-		for _, s := range r.Peers {
-			for _, downStore := range downStores {
-				if downStore == s.StoreID {
-					downRegionArr = append(downRegionArr, s.ID)
+	columns := []string{"RegionID", "Leader", "Peers", "Category"}
+
+	g := errgroup.Group{}
+	g.SetLimit(concurrency)
+
+	var (
+		respArr   []Resp
+		regionIDS []string
+	)
+	respChan := make(chan Resp, concurrency)
+
+	go func() {
+		for c := range respChan {
+			regionIDS = append(regionIDS, c.RegionID)
+			respArr = append(respArr, c)
+		}
+	}()
+
+	for _, region := range region.Regions {
+		r := region
+		g.Go(func() error {
+			// 获取异常 Region
+			var downRegionArr []int
+
+			for _, ds := range r.DownPeers {
+				for _, downStore := range downStores {
+					if downStore == ds.Peer.StoreID {
+						downRegionArr = append(downRegionArr, r.ID)
+					}
 				}
 			}
-		}
 
-		// 异常副本数大于或等于正常副本数
-		if len(downRegionArr) >= (len(r.Peers) - len(downRegionArr)) {
-			regionID = append(regionID, strconv.Itoa(r.ID))
-			var tmpData []string
-			peerByte, err := json.Marshal(r.Peers)
-			if err != nil {
-				return err
+			// 异常副本数大于或等于正常副本数
+			if len(downRegionArr) >= (len(r.Peers) - len(downRegionArr)) {
+				var (
+					tmpData []string
+					resp    Resp
+				)
+
+				leaderByte, err := json.Marshal(r.Leader)
+				if err != nil {
+					return err
+				}
+				peerByte, err := json.Marshal(r.Peers)
+				if err != nil {
+					return err
+				}
+				tmpData = append(tmpData, strconv.Itoa(r.ID), string(leaderByte), string(peerByte))
+
+				resp.RegionID = strconv.Itoa(r.ID)
+				resp.RegionInfo = tmpData
+
+				respChan <- resp
 			}
-			tmpData = append(tmpData, strconv.Itoa(r.ID), strconv.Itoa(r.Leader.ID), string(peerByte), strconv.Itoa(r.ApproximateSize), strconv.Itoa(r.ApproximateKeys))
-			tmpRegionMap[strconv.Itoa(r.ID)] = tmpData
-		}
+			return nil
+		})
+	}
+
+	if err = g.Wait(); err != nil {
+		return err
 	}
 
 	// 获取 region 库表/索引信息
-	if len(regionID) == 0 {
+	if len(regionIDS) == 0 {
 		fmt.Println(">--------+  Replica Peer Is Normally +--------<")
 		return nil
 	}
 
-	regionMap, err := engine.GetRegionStatus(regionType, regionID)
+	regionMap, err := engine.GetRegionStatus(regionType, regionIDS)
 	if err != nil {
 		return err
 	}
 
-	for k, v := range regionMap {
-		// region ID Map
-		if _, ok := tmpRegionMap[k]; ok {
+	// region ID Map
+	var (
+		regionPanics []string
+	)
+	for _, resp := range respArr {
+		if _, ok := regionMap[resp.RegionID]; ok {
 			var (
 				dbInfos []DBINFO
 				tmpData []string
 			)
-			for _, m := range v {
+			for _, m := range regionMap[resp.RegionID] {
 				var dbInfo DBINFO
 				if err := json.Unmarshal([]byte(m), &dbInfo); err != nil {
 					return err
@@ -285,24 +239,144 @@ func GetMajorDownRegionPeer(regionType, pdAddr string, downTiKVS []string, engin
 				return err
 			}
 
-			tmpData = append(tmpRegionMap[k], string(pretty.Pretty(dbInfoByte)))
+			tmpData = append(resp.RegionInfo, string(pretty.Pretty(dbInfoByte)))
 			data = append(data, tmpData)
 		} else {
-			return fmt.Errorf("region id [%s] isn't exist", v)
+			regionPanics = append(regionPanics, resp.RegionID)
 		}
 	}
 
 	util.QueryResultFormatTableWithRowLineStyle(columns, data)
+
+	if len(regionPanics) > 0 {
+		fmt.Printf("region id [%s] query sql result isn't exist, please again check", regionPanics)
+	}
 	return nil
 }
 
-func GetLessDownRegionPeer(regionType, pdAddr string, downTiKVS []string, engine *db.Engine) error {
+func GetMajorDownRegionPeer(regionType, pdAddr string, concurrency int, engine *db.Engine) error {
 	var (
-		data              [][]string
-		regionID          []string
-		downStores        []int
-		panicStores       []string
-		downRegionIDStore []string
+		data [][]string
+	)
+
+	region, err := getClusterDownRegion(pdAddr)
+	if err != nil {
+		return err
+	}
+	cfgReplica, err := getClusterConfigReplica(pdAddr)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf(">--------+  Cluster Replica Count: %v  +--------<\n", cfgReplica.MaxReplicas)
+	fmt.Printf(">--------+  Down Region Count: %v  +--------<\n", region.Count)
+	fmt.Println(">--------+  Scan Doing: Please Waiting  +--------<")
+
+	columns := []string{"RegionID", "Leader", "Peers", "Category"}
+
+	g := errgroup.Group{}
+	g.SetLimit(concurrency)
+
+	var (
+		respArr   []Resp
+		regionIDS []string
+	)
+	respChan := make(chan Resp, concurrency)
+
+	go func() {
+		for c := range respChan {
+			regionIDS = append(regionIDS, c.RegionID)
+			respArr = append(respArr, c)
+		}
+	}()
+
+	for _, region := range region.Regions {
+		r := region
+		g.Go(func() error {
+			// 获取异常 Region
+			// 异常副本数大于或等于正常副本数
+			if len(r.DownPeers) >= (len(r.Peers) - len(r.DownPeers)) {
+				var (
+					tmpData []string
+					resp    Resp
+				)
+
+				leaderByte, err := json.Marshal(r.Leader)
+				if err != nil {
+					return err
+				}
+				peerByte, err := json.Marshal(r.Peers)
+				if err != nil {
+					return err
+				}
+				tmpData = append(tmpData, strconv.Itoa(r.ID), string(leaderByte), string(peerByte))
+
+				resp.RegionID = strconv.Itoa(r.ID)
+				resp.RegionInfo = tmpData
+
+				respChan <- resp
+			}
+			return nil
+		})
+	}
+
+	if err = g.Wait(); err != nil {
+		return err
+	}
+
+	// 获取 region 库表/索引信息
+	if len(regionIDS) == 0 {
+		fmt.Println(">--------+  Replica Peer Is Normally +--------<")
+		return nil
+	}
+
+	regionMap, err := engine.GetRegionStatus(regionType, regionIDS)
+	if err != nil {
+		return err
+	}
+
+	// region ID Map
+	var (
+		regionPanics []string
+	)
+	for _, resp := range respArr {
+		if _, ok := regionMap[resp.RegionID]; ok {
+			var (
+				dbInfos []DBINFO
+				tmpData []string
+			)
+			for _, m := range regionMap[resp.RegionID] {
+				var dbInfo DBINFO
+				if err := json.Unmarshal([]byte(m), &dbInfo); err != nil {
+					return err
+				}
+				dbInfos = append(dbInfos, dbInfo)
+			}
+
+			dbInfoByte, err := json.Marshal(dbInfos)
+			if err != nil {
+				return err
+			}
+
+			tmpData = append(resp.RegionInfo, string(pretty.Pretty(dbInfoByte)))
+			data = append(data, tmpData)
+		} else {
+			regionPanics = append(regionPanics, resp.RegionID)
+		}
+	}
+
+	util.QueryResultFormatTableWithRowLineStyle(columns, data)
+
+	if len(regionPanics) > 0 {
+		fmt.Printf("region id [%s] query sql result isn't exist, please again check", regionPanics)
+	}
+	return nil
+}
+
+func GetLessDownRegionPeerByDownTiKVS(regionType, pdAddr string, concurrency int, downTiKVS []string, engine *db.Engine) error {
+	var (
+		data       [][]string
+		downStores []int
 	)
 
 	region, err := getClusterDownRegion(pdAddr)
@@ -322,71 +396,106 @@ func GetLessDownRegionPeer(regionType, pdAddr string, downTiKVS []string, engine
 		for _, s := range stores.Stores {
 			if strings.EqualFold(t, s.Store.Address) && strings.EqualFold(s.Store.StateName, "DOWN") {
 				downStores = append(downStores, s.Store.ID)
-			} else {
-				panicStores = append(panicStores, t)
 			}
 		}
 	}
 
-	if len(panicStores) > 0 {
-		return fmt.Errorf("down tikv [%v] isn't exist, please again check", panicStores)
+	if len(downStores) != len(downTiKVS) {
+		return fmt.Errorf("down tikv [%v] isn't exist, please again check down store [%v]", downTiKVS, downStores)
 	}
 
-	tmpRegionMap := make(map[string][]string)
+	fmt.Printf(">--------+  Cluster Replica Count: %v  +--------<\n", cfgReplica.MaxReplicas)
+	fmt.Printf(">--------+  Down Region Count: %v  +--------<\n", region.Count)
+	fmt.Println(">--------+  Scan Doing: Please Waiting  +--------<")
 
-	fmt.Printf(">--------+  Region Count: %v  +--------<\n", region.Count)
-	fmt.Printf(">--------+  Replica Count: %v  +--------<\n", cfgReplica.MaxReplicas)
+	columns := []string{"RegionID", "Leader", "Peers", "Category"}
 
-	columns := []string{"RegionID", "LeaderID", "Peers", "ApproximateSize", "ApproximateKeys", "Category"}
-	for _, r := range region.Regions {
-		// 获取异常 Region
-		var downRegionStoreArr []int
+	g := errgroup.Group{}
+	g.SetLimit(concurrency)
 
-		for _, s := range r.Peers {
-			for _, downStore := range downStores {
-				if downStore == s.StoreID {
-					downRegionStoreArr = append(downRegionStoreArr, s.StoreID)
+	var (
+		respArr   []Resp
+		regionIDS []string
+	)
+	respChan := make(chan Resp, concurrency)
+
+	go func() {
+		for c := range respChan {
+			regionIDS = append(regionIDS, c.RegionID)
+			respArr = append(respArr, c)
+		}
+	}()
+
+	for _, region := range region.Regions {
+		r := region
+		g.Go(func() error {
+			// 获取异常 Region
+			var downRegionStoreArr []int
+
+			for _, s := range r.DownPeers {
+				for _, downStore := range downStores {
+					if downStore == s.Peer.StoreID {
+						downRegionStoreArr = append(downRegionStoreArr, s.Peer.StoreID)
+					}
 				}
 			}
-		}
 
-		// 异常副本数小于正常副本数
-		if len(downRegionStoreArr) < (len(r.Peers) - len(downRegionStoreArr)) {
-			regionID = append(regionID, strconv.Itoa(r.ID))
-			var tmpData []string
-			peerByte, err := json.Marshal(r.Peers)
-			if err != nil {
-				return err
-			}
-			tmpData = append(tmpData, strconv.Itoa(r.ID), strconv.Itoa(r.Leader.ID), string(peerByte), strconv.Itoa(r.ApproximateSize), strconv.Itoa(r.ApproximateKeys))
-			tmpRegionMap[strconv.Itoa(r.ID)] = tmpData
+			// 异常副本数小于正常副本数
+			if len(downRegionStoreArr) < (len(r.Peers) - len(downRegionStoreArr)) {
+				var (
+					tmpData []string
+					resp    Resp
+				)
 
-			// 修复建议
-			for _, downRegionStore := range downRegionStoreArr {
-				downRegionIDStore = append(downRegionIDStore, fmt.Sprintf(`operator add remove-peer %d %d`, r.ID, downRegionStore))
+				leaderByte, err := json.Marshal(r.Leader)
+				if err != nil {
+					return err
+				}
+				peerByte, err := json.Marshal(r.Peers)
+				if err != nil {
+					return err
+				}
+				tmpData = append(tmpData, strconv.Itoa(r.ID), string(leaderByte), string(peerByte))
+
+				resp.RegionID = strconv.Itoa(r.ID)
+				resp.RegionInfo = tmpData
+				// 修复建议
+				for _, downRegionStore := range downRegionStoreArr {
+					resp.Fixed = fmt.Sprintf(`operator add remove-peer %d %d`, r.ID, downRegionStore)
+				}
+
+				respChan <- resp
 			}
-		}
+			return nil
+		})
+	}
+
+	if err = g.Wait(); err != nil {
+		return err
 	}
 
 	// 获取 region 库表/索引信息
-	if len(regionID) == 0 {
+	if len(regionIDS) == 0 {
 		fmt.Println(">--------+  Replica Peer Is Normally +--------<")
 		return nil
 	}
 
-	regionMap, err := engine.GetRegionStatus(regionType, regionID)
+	regionMap, err := engine.GetRegionStatus(regionType, regionIDS)
 	if err != nil {
 		return err
 	}
 
-	for k, v := range regionMap {
-		// region ID Map
-		if _, ok := tmpRegionMap[k]; ok {
+	// region ID Map
+	var (
+		regionPanics []string
+	)
+	for _, resp := range respArr {
+		if _, ok := regionMap[resp.RegionID]; ok {
 			var (
 				dbInfos []DBINFO
 				tmpData []string
 			)
-			for _, m := range v {
+			for _, m := range regionMap[resp.RegionID] {
 				var dbInfo DBINFO
 				if err := json.Unmarshal([]byte(m), &dbInfo); err != nil {
 					return err
@@ -399,18 +508,25 @@ func GetLessDownRegionPeer(regionType, pdAddr string, downTiKVS []string, engine
 				return err
 			}
 
-			tmpData = append(tmpRegionMap[k], string(pretty.Pretty(dbInfoByte)))
+			tmpData = append(resp.RegionInfo, string(pretty.Pretty(dbInfoByte)))
 			data = append(data, tmpData)
 		} else {
-			return fmt.Errorf("region id [%s] isn't exist", v)
+			regionPanics = append(regionPanics, resp.RegionID)
 		}
 	}
+
 	util.QueryResultFormatTableWithRowLineStyle(columns, data)
 
 	// 修复建议
-	for _, downRegionStore := range downRegionIDStore {
-		fmt.Printf("%s\n", downRegionStore)
+	for _, resp := range respArr {
+		fmt.Printf("%s\n", resp.Fixed)
 	}
+
+	// 异常检测
+	if len(regionPanics) > 0 {
+		fmt.Printf("region id [%s] query sql result isn't exist, please again check", regionPanics)
+	}
+
 	return nil
 }
 
@@ -472,8 +588,8 @@ func getClusterAllRegion(pdAddr string) (Region, error) {
 	return region, nil
 }
 
-func getClusterDownRegion(pdAddr string) (Region, error) {
-	var region Region
+func getClusterDownRegion(pdAddr string) (DownRegion, error) {
+	var region DownRegion
 
 	regionAPI := fmt.Sprintf("http://%s/pd/api/v1/regions/check/down-peer", pdAddr)
 	response, err := http.Get(regionAPI)

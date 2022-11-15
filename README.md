@@ -74,7 +74,11 @@ cluster 功能集：
 $ ./tidba cluster region -u {user} -p {password} --host {host} -P {port} --peers {peerNums} --pdAddr {pdAddr:serviePort} --regiontype {all/data/index}
 
 - 当 down tikv 宕机不可用，查找集群内所有 down-peer 副本数大于或等于正常副本数（多数派副本 DOWN）的所有 region 信息
-假设三副本集群，存在 kv 节点 1,2,28,30，若 down store 1,28 宕机不可用，查找集群内所有 Down 副本数大于或等于正常副本数（多数派副本 DOWN）的所有 region 信息
+假设三副本集群，存在 kv 节点 1,2,28,30，若 down store 1,28 宕机不可用，查找指定 down kv 节点集群内所有 Down 副本数大于或等于正常副本数（多数派副本 DOWN）的所有 region 信息
+$ ./tidba cluster region -u {user} -p {password} --host {host} -P {port} --dowtikv {tikv1:servicePort1,tikv2:servicePort2} --pdAddr {pdAddr:serviePort} --regiontype {all/data/index} --replicatype majorDown
+
+- 当 down tikv 宕机不可用，查找集群内所有 down-peer 副本数大于或等于正常副本数（多数派副本 DOWN）的所有 region 信息
+假设三副本集群，存在 kv 节点 down，查找集群内所有 Down 副本数大于或等于正常副本数（多数派副本 DOWN）的所有 region 信息
 $ ./tidba cluster region -u {user} -p {password} --host {host} -P {port} --dowtikv {tikv1:servicePort1,tikv2:servicePort2} --pdAddr {pdAddr:serviePort} --regiontype {all/data/index} --replicatype majorDown
 
 - 当 down tikv 宕机不可用，查找集群内所有 down-peer 副本数小于正常副本数（少数派副本 DOWN）的所有 region 信息，并产生修复 remove-peer 修复建议

@@ -111,12 +111,17 @@ func (app *AppClusterRegion) RunE(cmd *cobra.Command, args []string) error {
 		}
 
 	case app.downTiKVS != nil && app.peers == "" && strings.EqualFold(app.replicaType, "majorDown"):
-		if err := cluster.GetMajorDownRegionPeer(app.regionType, app.pdAddr, app.downTiKVS, engine); err != nil {
+		if err := cluster.GetMajorDownRegionPeerByDownTiKVS(app.regionType, app.pdAddr, app.Concurrency, app.downTiKVS, engine); err != nil {
+			return err
+		}
+
+	case app.downTiKVS == nil && app.peers == "" && strings.EqualFold(app.replicaType, "majorDown"):
+		if err := cluster.GetMajorDownRegionPeer(app.regionType, app.pdAddr, app.Concurrency, engine); err != nil {
 			return err
 		}
 
 	case app.downTiKVS != nil && app.peers == "" && strings.EqualFold(app.replicaType, "lessDown"):
-		if err := cluster.GetLessDownRegionPeer(app.regionType, app.pdAddr, app.downTiKVS, engine); err != nil {
+		if err := cluster.GetLessDownRegionPeerByDownTiKVS(app.regionType, app.pdAddr, app.Concurrency, app.downTiKVS, engine); err != nil {
 			return err
 		}
 
