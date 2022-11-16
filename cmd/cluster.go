@@ -72,6 +72,7 @@ type AppClusterRegion struct {
 	regionType  string
 	replicaType string
 	downTiKVS   []string
+	overview    bool
 }
 
 // is a method of App that returns a Cmder instance for the sub command
@@ -94,6 +95,7 @@ func (app *AppClusterRegion) Cmd() *cobra.Command {
 	cmd.Flags().StringVar(&app.regionType, "regiontype", "all", "configure cluster region type (data/index/all)")
 	cmd.Flags().StringVar(&app.replicaType, "replicatype", "", "configure cluster region replica problem type (majorDown/lessDown)")
 	cmd.Flags().StringSliceVarP(&app.downTiKVS, "downtikv", "s", nil, "configure tikv addr (tikvIP:servicePort)")
+	cmd.Flags().BoolVarP(&app.overview, "overview", "w", false, "view cluster down region overview")
 	return cmd
 }
 
@@ -102,6 +104,13 @@ func (app *AppClusterRegion) RunE(cmd *cobra.Command, args []string) error {
 	engine, err := db.NewMySQLEngine(app.user, app.password, app.host, app.port, "")
 	if err != nil {
 		return err
+	}
+
+	if app.overview && strings.EqualFold(app.replicaType, "majorDown") {
+		err = cluster.GetMajorDownRegionPeerOverview("all", app.pdAddr, app.Concurrency, engine)
+		if err != nil {
+			return err
+		}
 	}
 
 	switch {

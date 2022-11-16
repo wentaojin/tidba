@@ -227,3 +227,85 @@ WHERE
 
 	return regionMap, nil
 }
+
+func (e *Engine) GetRegionStatusGroupByTable(regionType string, regionArr []string, concurrency int) ([][]string, error) {
+	var querySQL string
+
+	var regionData [][]string
+
+	regionSpitArr := util.ArrayStringGroupsOf(regionArr, 1000)
+
+	g := &errgroup.Group{}
+	g.SetLimit(concurrency)
+
+	regionChan := make(chan []string, concurrency)
+	go func() {
+		for c := range regionChan {
+			regionData = append(regionData, c)
+		}
+	}()
+
+	for _, r := range regionSpitArr {
+		regions := r
+		g.Go(func() error {
+			if strings.EqualFold(regionType, "data") {
+				querySQL = fmt.Sprintf(`SELECT 
+	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
+	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
+	IFNULL(INDEX_NAME,"NULLABLE") AS INDEX_NAME,
+	COUNT(1) AS COUNTS
+FROM
+	INFORMATION_SCHEMA.TIKV_REGION_STATUS
+WHERE
+    IS_INDEX = 0
+    AND REGION_ID IN (%s)
+GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME`, strings.Join(regions, ","))
+			} else if strings.EqualFold(regionType, "index") {
+				querySQL = fmt.Sprintf(`SELECT 
+	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
+	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
+	IFNULL(INDEX_NAME,"NULLABLE") AS INDEX_NAME,
+	COUNT(1) AS COUNTS
+FROM
+	INFORMATION_SCHEMA.TIKV_REGION_STATUS
+WHERE
+    IS_INDEX = 1
+    AND REGION_ID IN (%s)
+GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME`, strings.Join(regions, ","))
+			} else if strings.EqualFold(regionType, "all") {
+				querySQL = fmt.Sprintf(`SELECT 
+	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
+	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
+	IFNULL(INDEX_NAME,"NULLABLE") AS INDEX_NAME,
+	COUNT(1) AS COUNTS
+FROM
+	INFORMATION_SCHEMA.TIKV_REGION_STATUS
+WHERE
+    REGION_ID IN (%s)
+GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME`, strings.Join(regions, ","))
+			} else {
+				return fmt.Errorf("region type [%s] isn't support", regionType)
+			}
+
+			_, res, err := e.Query(querySQL)
+			if err != nil {
+				return fmt.Errorf("failed get all store id from cluster: %v", err)
+			}
+
+			var tmpRegion []string
+			for _, s := range res {
+				tmpRegion = append(tmpRegion, s["DB_NAME"], s["TABLE_NAME"], s["INDEX_NAME"], s["COUNTS"])
+			}
+
+			regionChan <- tmpRegion
+			return nil
+		})
+
+	}
+
+	if err := g.Wait(); err != nil {
+		return regionData, err
+	}
+
+	return regionData, nil
+}

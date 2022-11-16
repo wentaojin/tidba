@@ -288,6 +288,8 @@ func GetMajorDownRegionPeer(regionType, pdAddr string, concurrency int, engine *
 	fmt.Printf("[5/6][region] get major down peer status... cost:[%v]\n", time.Now().Sub(startTime))
 
 	// region ID Map
+	// 忽略已被删除但未 GC 的 Region 信息 （tidb 接口内查询结果为空的 region）
+
 	var (
 		data         [][]string
 		regionPanics []string
@@ -364,6 +366,122 @@ func GetMajorDownRegionPeer(regionType, pdAddr string, concurrency int, engine *
 
 	fmt.Printf(">--------+  Program Region Result Count: %v  +--------<\n", len(data))
 
+	return nil
+}
+
+func GetMajorDownRegionPeerOverview(regionType, pdAddr string, concurrency int, engine *db.Engine) error {
+	startTime := time.Now()
+	region, err := getClusterAllRegion(pdAddr)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[1/6][region] get down region peer info... cost:[%v]\n", time.Now().Sub(startTime))
+
+	startTime = time.Now()
+	cfgReplica, err := getClusterConfigReplica(pdAddr)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[2/6][region] get cluster config replica info... cost:[%v]\n", time.Now().Sub(startTime))
+
+	startTime = time.Now()
+	allStores, err := getClusterStores(pdAddr)
+	if err != nil {
+		return err
+	}
+	downStores := make(map[int]struct{})
+	for _, s := range allStores.Stores {
+		if strings.EqualFold(s.Store.StateName, "DOWN") {
+			downStores[s.Store.ID] = struct{}{}
+		}
+	}
+
+	fmt.Printf("[3/6][region] get cluster down store info... cost:[%v]\n", time.Now().Sub(startTime))
+
+	startTime = time.Now()
+	g := errgroup.Group{}
+	g.SetLimit(concurrency)
+
+	var (
+		regionIDS []string
+	)
+	regionMaps := &sync.Map{}
+
+	respChan := make(chan Resp, concurrency)
+
+	go func() {
+		for c := range respChan {
+			regionIDS = append(regionIDS, c.RegionID)
+			regionMaps.Store(c.RegionID, c.RegionInfo)
+		}
+	}()
+
+	for _, region := range region.Regions {
+		r := region
+		g.Go(func() error {
+			// 获取异常 Region
+			var downRegionArr []int
+
+			for _, ds := range r.Peers {
+				if _, ok := downStores[ds.StoreID]; ok {
+					downRegionArr = append(downRegionArr, r.ID)
+				}
+			}
+
+			// 异常副本数大于或等于正常副本数
+			if len(downRegionArr) >= (len(r.Peers) - len(downRegionArr)) {
+				var (
+					tmpData []string
+					resp    Resp
+				)
+
+				leaderByte, err := json.Marshal(r.Leader)
+				if err != nil {
+					return err
+				}
+				peerByte, err := json.Marshal(r.Peers)
+				if err != nil {
+					return err
+				}
+				tmpData = append(tmpData, strconv.Itoa(r.ID), string(pretty.Pretty(leaderByte)), string(pretty.Pretty(peerByte)))
+
+				resp.RegionID = strconv.Itoa(r.ID)
+				resp.RegionInfo = tmpData
+
+				respChan <- resp
+			}
+			return nil
+		})
+	}
+
+	if err = g.Wait(); err != nil {
+		return err
+	}
+
+	fmt.Printf("[4/6][region] get major down peer info... cost:[%v]\n", time.Now().Sub(startTime))
+
+	// 获取 region 库表/索引信息
+	if len(regionIDS) == 0 {
+		fmt.Println(">--------+  Replica Peer Is Normally +--------<")
+		return nil
+	}
+
+	startTime = time.Now()
+
+	// 忽略已被删除但未 GC 的 Region 信息 （tidb 接口内查询结果为空的 region）
+	regionData, err := engine.GetRegionStatusGroupByTable(regionType, regionIDS, concurrency)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("[5/6][region] get major down peer status... cost:[%v]\n", time.Now().Sub(startTime))
+
+	fmt.Printf(">--------+  Cluster Replica Count: %v  +--------<\n", cfgReplica.MaxReplicas)
+	fmt.Printf(">--------+  Down Region Count: %v  +--------<\n", region.Count)
+
+	columns := []string{"DB_NAME", "TABLE_NAME", "INDEX_NAME", "DOWN_REGIONS"}
+	util.QueryResultFormatTableWithRowLineStyle(columns, regionData)
+
+	fmt.Printf(">--------+  Program Table Result Count: %v  +--------<\n", len(regionData))
 	return nil
 }
 
@@ -479,6 +597,7 @@ func GetMajorDownRegionPeerByDownTiKVS(regionType, pdAddr string, concurrency in
 	fmt.Printf("[5/6][region] get major down peer status... cost:[%v]\n", time.Now().Sub(startTime))
 
 	// region ID Map
+	// 忽略已被删除但未 GC 的 Region 信息 （tidb 接口内查询结果为空的 region）
 	var (
 		data         [][]string
 		regionPanics []string
@@ -675,6 +794,8 @@ func GetLessDownRegionPeerByDownTiKVS(regionType, pdAddr string, concurrency int
 	fmt.Printf("[5/6][region] get major down peer status... cost:[%v]\n", time.Now().Sub(startTime))
 
 	// region ID Map
+	// 忽略已被删除但未 GC 的 Region 信息 （tidb 接口内查询结果为空的 region）
+
 	var (
 		data         [][]string
 		regionPanics []string
