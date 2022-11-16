@@ -139,5 +139,5 @@ type DownRegion struct {
 type Resp struct {
 	RegionID   string
 	RegionInfo []string
-	Fixed      string
+	Fixed      []string
 }

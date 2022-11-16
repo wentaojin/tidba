@@ -20,7 +20,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/wentaojin/tidba/util"
+	"golang.org/x/sync/errgroup"
 	"strings"
+	"sync"
 
 	_ "github.com/go-sql-driver/mysql"
 )
@@ -133,14 +135,31 @@ func (e *Engine) GetAllStores() ([]string, error) {
 	return stores, nil
 }
 
-func (e *Engine) GetRegionStatus(regionType string, regionArr []string) (map[string][]string, error) {
+func (e *Engine) GetRegionStatus(regionType string, regionArr []string, concurrency int) (*sync.Map, error) {
 	var querySQL string
-	regionMap := make(map[string][]string)
+
+	regionMap := &sync.Map{}
 
 	regionSpitArr := util.ArrayStringGroupsOf(regionArr, 1000)
-	for _, regions := range regionSpitArr {
-		if strings.EqualFold(regionType, "data") {
-			querySQL = fmt.Sprintf(`SELECT 
+
+	g := &errgroup.Group{}
+	g.SetLimit(concurrency)
+
+	regionIDMapChan := make(chan map[string][]string, concurrency)
+	go func() {
+		for c := range regionIDMapChan {
+			// merge map
+			for k, v := range c {
+				regionMap.Store(k, v)
+			}
+		}
+	}()
+
+	for _, r := range regionSpitArr {
+		regions := r
+		g.Go(func() error {
+			if strings.EqualFold(regionType, "data") {
+				querySQL = fmt.Sprintf(`SELECT 
     REGION_ID,
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
@@ -150,8 +169,8 @@ FROM
 WHERE
     IS_INDEX = 0
     AND REGION_ID IN (%s)`, strings.Join(regions, ","))
-		} else if strings.EqualFold(regionType, "index") {
-			querySQL = fmt.Sprintf(`SELECT 
+			} else if strings.EqualFold(regionType, "index") {
+				querySQL = fmt.Sprintf(`SELECT 
     REGION_ID,
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
@@ -161,8 +180,8 @@ FROM
 WHERE
     IS_INDEX = 1
     AND REGION_ID IN (%s)`, strings.Join(regions, ","))
-		} else if strings.EqualFold(regionType, "all") {
-			querySQL = fmt.Sprintf(`SELECT 
+			} else if strings.EqualFold(regionType, "all") {
+				querySQL = fmt.Sprintf(`SELECT 
     REGION_ID,
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
@@ -171,60 +190,39 @@ FROM
 	INFORMATION_SCHEMA.TIKV_REGION_STATUS
 WHERE
     REGION_ID IN (%s)`, strings.Join(regions, ","))
-		} else {
-			return map[string][]string{}, fmt.Errorf("region type [%s] isn't support", regionType)
-		}
+			} else {
+				return fmt.Errorf("region type [%s] isn't support", regionType)
+			}
 
-		_, res, err := e.Query(querySQL)
-		if err != nil {
-			return regionMap, fmt.Errorf("failed get all store id from cluster: %v", err)
-		}
+			_, res, err := e.Query(querySQL)
+			if err != nil {
+				return fmt.Errorf("failed get all store id from cluster: %v", err)
+			}
 
-		for _, r := range regions {
-			var tmpRegionArr []string
-
-			tmpRegionIDMap := make(map[string]struct{})
-
+			tmpRegionIDMap := make(map[string][]string)
 			for _, s := range res {
-				switch strings.ToUpper(regionType) {
-				case "ALL":
-					if strings.EqualFold(r, s["REGION_ID"]) {
-						regionByte, err := json.Marshal(s)
-						if err != nil {
-							return regionMap, err
-						}
-						tmpRegionArr = append(tmpRegionArr, string(regionByte))
-						tmpRegionIDMap[s["REGION_ID"]] = struct{}{}
-					}
-				case "DATA":
-					if strings.EqualFold(r, s["REGION_ID"]) && s["INDEX_NAME"] == "NULLABLE" {
-						regionByte, err := json.Marshal(s)
-						if err != nil {
-							return regionMap, err
-						}
-
-						tmpRegionArr = append(tmpRegionArr, string(regionByte))
-						tmpRegionIDMap[s["REGION_ID"]] = struct{}{}
-					}
-				case "INDEX":
-					if strings.EqualFold(r, s["REGION_ID"]) && s["INDEX_NAME"] != "NULLABLE" {
-						regionByte, err := json.Marshal(s)
-						if err != nil {
-							return regionMap, err
-						}
-
-						tmpRegionArr = append(tmpRegionArr, string(regionByte))
-						tmpRegionIDMap[s["REGION_ID"]] = struct{}{}
-					}
+				regionByte, err := json.Marshal(s)
+				if err != nil {
+					return err
 				}
-
+				if _, ok := tmpRegionIDMap[s["REGION_ID"]]; ok {
+					var tmpRegionArr []string
+					tmpRegionArr = append(tmpRegionArr, tmpRegionIDMap[s["REGION_ID"]]...)
+					tmpRegionArr = append(tmpRegionArr, string(regionByte))
+					tmpRegionIDMap[s["REGION_ID"]] = tmpRegionArr
+				} else {
+					tmpRegionIDMap[s["REGION_ID"]] = []string{string(regionByte)}
+				}
 			}
 
-			// regionID 判断
-			if _, ok := tmpRegionIDMap[r]; ok {
-				regionMap[r] = tmpRegionArr
-			}
-		}
+			regionIDMapChan <- tmpRegionIDMap
+			return nil
+		})
+
+	}
+
+	if err := g.Wait(); err != nil {
+		return regionMap, err
 	}
 
 	return regionMap, nil

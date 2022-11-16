@@ -106,7 +106,7 @@ func (app *AppClusterRegion) RunE(cmd *cobra.Command, args []string) error {
 
 	switch {
 	case app.peers != "" && app.downTiKVS == nil && app.replicaType == "":
-		if err := cluster.GetCurrentRegionPeer(app.peers, app.regionType, app.pdAddr, engine); err != nil {
+		if err := cluster.GetCurrentRegionPeer(app.peers, app.regionType, app.pdAddr, app.Concurrency, engine); err != nil {
 			return err
 		}
 
@@ -126,7 +126,7 @@ func (app *AppClusterRegion) RunE(cmd *cobra.Command, args []string) error {
 		}
 
 	case app.regionID != nil && app.downTiKVS == nil && app.peers == "" && app.replicaType == "" && app.regionType == "all":
-		if err := cluster.GetRegionIDINFO(app.regionID, app.regionType, app.pdAddr, engine); err != nil {
+		if err := cluster.GetRegionIDINFO(app.regionID, app.regionType, app.pdAddr, app.Concurrency, engine); err != nil {
 			return err
 		}
 
