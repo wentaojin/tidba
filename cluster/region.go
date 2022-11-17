@@ -230,8 +230,8 @@ func GetMajorDownRegionPeer(regionType, pdAddr string, concurrency int, engine *
 		}
 	}()
 
-	for _, region := range region.Regions {
-		r := region
+	for _, res := range region.Regions {
+		r := res
 		g.Go(func() error {
 			// 获取异常 Region
 			var downRegionArr []int
@@ -416,8 +416,8 @@ func GetMajorDownRegionPeerOverview(regionType, pdAddr string, concurrency int, 
 		}
 	}()
 
-	for _, region := range region.Regions {
-		r := region
+	for _, res := range region.Regions {
+		r := res
 		g.Go(func() error {
 			// 获取异常 Region
 			var downRegionArr []int

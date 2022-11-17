@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"github.com/wentaojin/tidba/util"
 	"golang.org/x/sync/errgroup"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -238,10 +239,21 @@ func (e *Engine) GetRegionStatusGroupByTable(regionType string, regionArr []stri
 	g := &errgroup.Group{}
 	g.SetLimit(concurrency)
 
-	regionChan := make(chan []string, concurrency)
+	smap := &sync.Map{}
+
+	regionChan := make(chan map[string]string, concurrency)
 	go func() {
+		// query result group by count
 		for c := range regionChan {
-			regionData = append(regionData, c)
+			for k, v := range c {
+				if vs, ok := smap.Load(k); ok {
+					atoiV, _ := strconv.Atoi(vs.(string))
+					atoiC, _ := strconv.Atoi(v)
+					smap.Store(k, strconv.Itoa(atoiC+atoiV))
+				} else {
+					smap.Store(k, v)
+				}
+			}
 		}
 	}()
 
@@ -259,7 +271,8 @@ FROM
 WHERE
     IS_INDEX = 0
     AND REGION_ID IN (%s)
-GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME`, strings.Join(regions, ","))
+GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME
+ORDER BY COUNTS`, strings.Join(regions, ","))
 			} else if strings.EqualFold(regionType, "index") {
 				querySQL = fmt.Sprintf(`SELECT 
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
@@ -271,7 +284,8 @@ FROM
 WHERE
     IS_INDEX = 1
     AND REGION_ID IN (%s)
-GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME`, strings.Join(regions, ","))
+GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME
+ORDER BY COUNTS`, strings.Join(regions, ","))
 			} else if strings.EqualFold(regionType, "all") {
 				querySQL = fmt.Sprintf(`SELECT 
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
@@ -282,7 +296,8 @@ FROM
 	INFORMATION_SCHEMA.TIKV_REGION_STATUS
 WHERE
     REGION_ID IN (%s)
-GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME`, strings.Join(regions, ","))
+GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME
+ORDER BY COUNTS`, strings.Join(regions, ","))
 			} else {
 				return fmt.Errorf("region type [%s] isn't support", regionType)
 			}
@@ -292,12 +307,12 @@ GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME`, strings.Join(regions, ","))
 				return fmt.Errorf("failed get all store id from cluster: %v", err)
 			}
 
-			var tmpRegion []string
-			for _, s := range res {
-				tmpRegion = append(tmpRegion, s["DB_NAME"], s["TABLE_NAME"], s["INDEX_NAME"], s["COUNTS"])
+			tmpRegionDataMap := make(map[string]string)
+			for _, r := range res {
+				tmpRegionDataMap[fmt.Sprintf("%s %s %s", r["DB_NAME"], r["TABLE_NAME"], r["INDEX_NAME"])] = r["COUNTS"]
 			}
 
-			regionChan <- tmpRegion
+			regionChan <- tmpRegionDataMap
 			return nil
 		})
 
@@ -306,6 +321,16 @@ GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME`, strings.Join(regions, ","))
 	if err := g.Wait(); err != nil {
 		return regionData, err
 	}
+
+	smap.Range(func(key, value any) bool {
+		var tmp []string
+		for _, s := range strings.Fields(key.(string)) {
+			tmp = append(tmp, s)
+		}
+		tmp = append(tmp, value.(string))
+		regionData = append(regionData, tmp)
+		return true
+	})
 
 	return regionData, nil
 }
