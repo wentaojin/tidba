@@ -147,20 +147,16 @@ func (e *Engine) GetRegionStatus(regionType string, regionArr []string, concurre
 	g.SetLimit(concurrency)
 
 	regionIDMapChan := make(chan map[string][]string, concurrency)
-	go func() {
-		for c := range regionIDMapChan {
-			// merge map
-			for k, v := range c {
-				regionMap.Store(k, v)
-			}
-		}
-	}()
 
-	for _, r := range regionSpitArr {
-		regions := r
-		g.Go(func() error {
-			if strings.EqualFold(regionType, "data") {
-				querySQL = fmt.Sprintf(`SELECT 
+	g1 := &errgroup.Group{}
+	g1.SetLimit(1)
+
+	g1.Go(func() error {
+		for _, r := range regionSpitArr {
+			regions := r
+			g.Go(func() error {
+				if strings.EqualFold(regionType, "data") {
+					querySQL = fmt.Sprintf(`SELECT 
     REGION_ID,
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
@@ -170,8 +166,8 @@ FROM
 WHERE
     IS_INDEX = 0
     AND REGION_ID IN (%s)`, strings.Join(regions, ","))
-			} else if strings.EqualFold(regionType, "index") {
-				querySQL = fmt.Sprintf(`SELECT 
+				} else if strings.EqualFold(regionType, "index") {
+					querySQL = fmt.Sprintf(`SELECT 
     REGION_ID,
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
@@ -181,8 +177,8 @@ FROM
 WHERE
     IS_INDEX = 1
     AND REGION_ID IN (%s)`, strings.Join(regions, ","))
-			} else if strings.EqualFold(regionType, "all") {
-				querySQL = fmt.Sprintf(`SELECT 
+				} else if strings.EqualFold(regionType, "all") {
+					querySQL = fmt.Sprintf(`SELECT 
     REGION_ID,
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
@@ -191,38 +187,52 @@ FROM
 	INFORMATION_SCHEMA.TIKV_REGION_STATUS
 WHERE
     REGION_ID IN (%s)`, strings.Join(regions, ","))
-			} else {
-				return fmt.Errorf("region type [%s] isn't support", regionType)
-			}
-
-			_, res, err := e.Query(querySQL)
-			if err != nil {
-				return fmt.Errorf("failed get all store id from cluster: %v", err)
-			}
-
-			tmpRegionIDMap := make(map[string][]string)
-			for _, s := range res {
-				regionByte, err := json.Marshal(s)
-				if err != nil {
-					return err
-				}
-				if _, ok := tmpRegionIDMap[s["REGION_ID"]]; ok {
-					var tmpRegionArr []string
-					tmpRegionArr = append(tmpRegionArr, tmpRegionIDMap[s["REGION_ID"]]...)
-					tmpRegionArr = append(tmpRegionArr, string(regionByte))
-					tmpRegionIDMap[s["REGION_ID"]] = tmpRegionArr
 				} else {
-					tmpRegionIDMap[s["REGION_ID"]] = []string{string(regionByte)}
+					return fmt.Errorf("region type [%s] isn't support", regionType)
 				}
-			}
 
-			regionIDMapChan <- tmpRegionIDMap
-			return nil
-		})
+				_, res, err := e.Query(querySQL)
+				if err != nil {
+					return fmt.Errorf("failed get all store id from cluster: %v", err)
+				}
 
+				tmpRegionIDMap := make(map[string][]string)
+				for _, s := range res {
+					regionByte, err := json.Marshal(s)
+					if err != nil {
+						return err
+					}
+					if _, ok := tmpRegionIDMap[s["REGION_ID"]]; ok {
+						var tmpRegionArr []string
+						tmpRegionArr = append(tmpRegionArr, tmpRegionIDMap[s["REGION_ID"]]...)
+						tmpRegionArr = append(tmpRegionArr, string(regionByte))
+						tmpRegionIDMap[s["REGION_ID"]] = tmpRegionArr
+					} else {
+						tmpRegionIDMap[s["REGION_ID"]] = []string{string(regionByte)}
+					}
+				}
+
+				regionIDMapChan <- tmpRegionIDMap
+				return nil
+			})
+
+		}
+		if err := g.Wait(); err != nil {
+			return err
+		}
+
+		close(regionIDMapChan)
+		return nil
+	})
+
+	for c := range regionIDMapChan {
+		// merge map
+		for k, v := range c {
+			regionMap.Store(k, v)
+		}
 	}
 
-	if err := g.Wait(); err != nil {
+	if err := g1.Wait(); err != nil {
 		return regionMap, err
 	}
 
@@ -239,29 +249,17 @@ func (e *Engine) GetRegionStatusGroupByTable(regionType string, regionArr []stri
 	g := &errgroup.Group{}
 	g.SetLimit(concurrency)
 
+	g1 := &errgroup.Group{}
+	g1.SetLimit(1)
 	smap := &sync.Map{}
 
 	regionChan := make(chan map[string]string, concurrency)
-	go func() {
-		// query result group by count
-		for c := range regionChan {
-			for k, v := range c {
-				if vs, ok := smap.Load(k); ok {
-					atoiV, _ := strconv.Atoi(vs.(string))
-					atoiC, _ := strconv.Atoi(v)
-					smap.Store(k, strconv.Itoa(atoiC+atoiV))
-				} else {
-					smap.Store(k, v)
-				}
-			}
-		}
-	}()
-
-	for _, r := range regionSpitArr {
-		regions := r
-		g.Go(func() error {
-			if strings.EqualFold(regionType, "data") {
-				querySQL = fmt.Sprintf(`SELECT 
+	g1.Go(func() error {
+		for _, r := range regionSpitArr {
+			regions := r
+			g.Go(func() error {
+				if strings.EqualFold(regionType, "data") {
+					querySQL = fmt.Sprintf(`SELECT 
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
 	IFNULL(INDEX_NAME,"NULLABLE") AS INDEX_NAME,
@@ -273,8 +271,8 @@ WHERE
     AND REGION_ID IN (%s)
 GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME
 ORDER BY COUNTS`, strings.Join(regions, ","))
-			} else if strings.EqualFold(regionType, "index") {
-				querySQL = fmt.Sprintf(`SELECT 
+				} else if strings.EqualFold(regionType, "index") {
+					querySQL = fmt.Sprintf(`SELECT 
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
 	IFNULL(INDEX_NAME,"NULLABLE") AS INDEX_NAME,
@@ -286,8 +284,8 @@ WHERE
     AND REGION_ID IN (%s)
 GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME
 ORDER BY COUNTS`, strings.Join(regions, ","))
-			} else if strings.EqualFold(regionType, "all") {
-				querySQL = fmt.Sprintf(`SELECT 
+				} else if strings.EqualFold(regionType, "all") {
+					querySQL = fmt.Sprintf(`SELECT 
 	IFNULL(DB_NAME,"NULLABLE") AS DB_NAME,
 	IFNULL(TABLE_NAME,"NULLABLE") AS TABLE_NAME,
 	IFNULL(INDEX_NAME,"NULLABLE") AS INDEX_NAME,
@@ -298,27 +296,48 @@ WHERE
     REGION_ID IN (%s)
 GROUP BY DB_NAME,TABLE_NAME,INDEX_NAME
 ORDER BY COUNTS`, strings.Join(regions, ","))
+				} else {
+					return fmt.Errorf("region type [%s] isn't support", regionType)
+				}
+
+				_, res, err := e.Query(querySQL)
+				if err != nil {
+					return fmt.Errorf("failed get all store id from cluster: %v", err)
+				}
+
+				tmpRegionDataMap := make(map[string]string)
+				for _, r := range res {
+					tmpRegionDataMap[fmt.Sprintf("%s %s %s", r["DB_NAME"], r["TABLE_NAME"], r["INDEX_NAME"])] = r["COUNTS"]
+				}
+
+				regionChan <- tmpRegionDataMap
+				return nil
+			})
+
+		}
+
+		if err := g.Wait(); err != nil {
+			return err
+		}
+
+		close(regionChan)
+		return nil
+	})
+
+	// query result group by count
+	for c := range regionChan {
+		for k, v := range c {
+			if vs, ok := smap.Load(k); ok {
+				atoiV, _ := strconv.Atoi(vs.(string))
+				atoiC, _ := strconv.Atoi(v)
+				smap.Store(k, strconv.Itoa(atoiC+atoiV))
 			} else {
-				return fmt.Errorf("region type [%s] isn't support", regionType)
+				smap.Store(k, v)
 			}
-
-			_, res, err := e.Query(querySQL)
-			if err != nil {
-				return fmt.Errorf("failed get all store id from cluster: %v", err)
-			}
-
-			tmpRegionDataMap := make(map[string]string)
-			for _, r := range res {
-				tmpRegionDataMap[fmt.Sprintf("%s %s %s", r["DB_NAME"], r["TABLE_NAME"], r["INDEX_NAME"])] = r["COUNTS"]
-			}
-
-			regionChan <- tmpRegionDataMap
-			return nil
-		})
-
+		}
 	}
 
-	if err := g.Wait(); err != nil {
+	if err := g1.Wait(); err != nil {
 		return regionData, err
 	}
 
