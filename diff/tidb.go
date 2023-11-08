@@ -87,7 +87,7 @@ func getClusterJsonDiff(baseAddr, baseUser, basePassword, newAddr, newUser, newP
 	if err != nil {
 		return err
 	}
-	newJsonByte, err := getClusterJson(newAddr, newUser, newPassword, newPort, diffType)
+	newJsonByte, err := getClusterJson(newAddrArr[0], newUser, newPassword, newPort, diffType)
 	if err != nil {
 		return err
 	}
