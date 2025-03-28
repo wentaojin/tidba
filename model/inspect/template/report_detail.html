@@ -1,0 +1,660 @@
+{{ define "report_detail" }}
+<h3>三、基础检查</h3>
+<h4 id="insp_0">3.1 硬件基本信息</h4>
+<table>
+    <thead>
+        <tr>
+            <th>IP 地址</th>
+            <th>CPU 架构</th>
+			<th>vcore 数量</th>
+            <th>NUMA 信息</th>
+            <th>内存信息</th>
+            <th>操作系统版本</th>
+        </tr>
+    </thead>
+    <tbody>
+        {{ range .BasicHardwares }}
+        <tr>
+            <td>{{.IpAddress}}</td>
+            <td>{{.CpuArch}}</td>
+            <td>{{.CpuVcore}}</td>
+            <td>{{.Numa}}</td>
+            <td>{{.Memory}}</td>
+            <td>{{.OsVersion}}</td>
+        </tr>
+        {{ end }}
+    </tbody>
+</table>
+<h4 id="insp_1">3.2 软件基本信息</h4>
+<table>
+    <tr>
+        <th>项目</th>
+        <th>值</th>
+    </tr>
+    {{ range .BasicSoftwares }}
+    <tr>
+        <td>{{.Category}}</td>
+        <td>{{.Value}}</td>
+    </tr>
+    {{ end }}
+</table>
+<h4>拓扑信息：</h4>
+<table>
+    <tr>
+        <th>IP</th>
+        <th>组件分布</th>
+    </tr>
+    {{ range .ClusterTopologys }}
+    <tr>
+        <td>{{.IpAddress}}</td>
+        <td>{{.Components}}</td>
+    </tr>
+    {{ end }}
+</table>    
+<h4 id="insp_2">3.3 TiDB 集群总览</h4>
+<table>
+    <tr>
+        <th class="checkItem">检查条目</th>
+        <th>检查标准</th>
+        <th class="checkResult">检查结果</th>
+        <th>结果描述</th>
+    </tr>
+    {{ range .ClusterSummarys }}
+    <tr>
+        <td>{{.CheckItem}}</td>
+        <td>{{.CheckBaseline}}</td>
+        {{ if eq .CheckResult "异常" }}
+        <td style="color:red;">{{.CheckResult}}</td>
+        {{ else }}
+        <td style="color:green;">{{.CheckResult}}</td>
+        {{ end }}
+        <td>{{.ResultDesc }}</td>
+    </tr>
+    {{ end }}
+</table>
+<h4 id="insp_3">3.4 开发规范最佳实践检查</h4>
+<p style='color: red; font-weight: bold; margin-bottom: 10px;'>注意：</p>
+<p style='color: red; font-weight: bold; margin-bottom: 10px;'>- 所有检查条目异常情况都未超 50 张表，当前巡检报告自动显示所有异常情况且不再输出 EXCEL 表格。</p>
+<p style='color: red; font-weight: bold; margin-bottom: 10px;'>- 任何检查条目异常情况超 50 张表，则屏蔽输出只显示 50 张表，待集群巡检完毕以 EXCEL 表格形式输出所有检查项异常记录。</p>
+<table>
+    <tr>
+        <th class="checkItem">检查条目</th>
+        <th class="suggestType">整改类型</th>
+        <th>最佳实践描述</th>
+        <th class="checkResult">检查结果</th>
+        <th>异常情况</th>
+    </tr>
+    {{ range .DevBestPractices }}
+    <tr>
+        <td>{{.CheckItem}}</td>
+        <td>{{.CorrectionSuggest}}</td>
+        <td>{{.BestPracticeDesc}}</td>
+        {{ if eq .CheckResult "异常" }}
+        <td style="color:red;">{{.CheckResult}}</td>
+        {{ else }}
+        <td style="color:green;">{{.CheckResult}}</td>
+        {{ end }}
+        <td>{{.AbnormalDetail }}</td>
+    </tr>
+    {{ end }}    
+</table>
+<h4 id="insp_4">3.5 数据库参数最佳实践检查</h4>
+<h5>Variables</h5>
+<table>
+    <tr>
+        <th>组件</th>
+        <th>参数名</th>
+        <th>默认值</th>
+        <th>当前值</th>
+        <th>标准化值</th>
+        <th>是否标准化</th>
+    </tr>
+    {{ range .DatabaseVaribales }}
+    <tr>
+        <td>{{.Component}}</td>
+        <td>{{.ParamName}}</td>
+        <td>{{.DefaultValue}}</td>
+        <td>{{.CurrentValue}}</td>
+        <td>{{.StandardValue}}</td>
+        {{ if eq .IsStandard "否" }}
+        <td style="color:red;">{{.IsStandard}}</td>
+        {{ else }}
+        <td style="color:green;">{{.IsStandard}}</td>
+        {{ end }}
+    </tr>
+    {{ end }}
+</table>
+<h5>Config</h5>
+<table>
+    <tr>
+        <th>组件</th>
+        <th>实例</th>
+        <th>参数名</th>
+        <th>当前值</th>
+        <th>标准化值</th>
+        <th>是否标准化</th>
+    </tr>
+    {{ range .DatabaseConfigs }}
+    <tr>
+        <td>{{.Component}}</td>
+        <td>{{.Instance}}</td>
+        <td>{{.ParamName}}</td>
+        <td>{{.CurrentValue}}</td>
+        <td>{{.StandardValue}}</td>
+        {{ if eq .IsStandard "否" }}
+        <td style="color:red;">{{.IsStandard}}</td>
+        {{ else }}
+        <td style="color:green;">{{.IsStandard}}</td>
+        {{ end }}
+    </tr>
+    {{end}}
+</table>
+<h4 id="insp_5">3.6 统计信息最佳实践检查</h4>
+<p style='color: red; font-weight: bold; margin-bottom: 10px;'>注意：</p>
+<p style='color: red; font-weight: bold; margin-bottom: 10px;'>- 所有检查条目异常情况都未超 50 张表，当前巡检报告自动显示所有异常情况且不再输出 EXCEL 表格。</p>
+<p style='color: red; font-weight: bold; margin-bottom: 10px;'>- 任何检查条目异常情况超 50 张表，则屏蔽输出只显示 50 张表，待集群巡检完毕以 EXCEL 表格形式输出所有检查项异常记录。</p>
+<table>
+    <tr>
+        <th>检查条目</th>
+        <th>检查标准</th>
+        <th class="checkResult">检查结果</th>
+        <th>异常情况</th>
+    </tr>
+    {{ range .DatabaseStatistics }}
+    <tr>
+        <td>{{.CheckItem}}</td>
+        <td>{{.CheckStandard}}</td>
+        {{ if eq .CheckResult "异常" }}
+        <td style="color:red;">{{.CheckResult}}</td>
+        {{ else }}
+        <td style="color:green;">{{.CheckResult}}</td>
+        {{ end }}
+        <td>{{.AbnormalDetail}}</td>
+    </tr>
+    {{ end }}  
+</table>
+<h4 id="insp_6">3.7 系统配置最佳实践检查</h4>
+<table>
+    <tr>
+        <th>检查条目</th>
+        <th>检查标准</th>
+    </tr>
+    {{ range .SystemConfigs }}
+    <tr>
+        <td>{{.CheckItem}}</td>
+        <td>{{.CheckStandard}}</td>
+    </tr>
+    {{ end }}  
+</table>
+<br>
+<p></p>
+{{ if .SystemConfigOutputs }}
+<p style='color: red; font-weight: bold; margin-bottom: 10px;'>异常结果输出：</p>
+{{ else }}
+<p>异常结果输出：</p>
+{{ end }}
+<table>
+    <tr>
+        <th class="systemOutput">IP地址</th>
+        <th>异常描述</th>
+    </tr>
+    {{ if .SystemConfigOutputs }}
+        {{ range .SystemConfigOutputs }}
+        <tr>
+            <td>{{.IpAddress}}</td>
+            <td>{{.AbnormalDetail}}</td>
+        </tr>
+        {{ end }}      
+    {{ else }}
+        <p>所有主机均未检测到异常。</p>
+    {{ end }}
+</table>
+<h4 id="insp_7">3.8 crontab 情况</h4>
+<table>
+    <tr>
+        <th>IP 地址</th>
+        <th>用户</th>
+        <th>Crontab 内容</th>
+    </tr>
+    {{ range .SystemCrontabs }}
+    <tr>
+        <td>{{.IpAddress}}</td>
+        <td>{{.CrontabUser}}</td>
+        <td>{{.CrontabContent }}</td>
+    </tr>
+    {{ end }}  
+</table>
+<h4 id="insp_8">3.9 dmesg 日志</h4>
+<table>
+    <tr>
+        <th class="component">IP 地址</th>
+        <th class="component">异常状态</th>
+        <th>异常摘要</th>
+    </tr>
+    {{ range .SystemDmesgs }}
+    <tr>
+        <td>{{.IpAddress}}</td>
+        {{ if eq .AbnormalStatus "异常" }}
+            <td><span style="color:red;">{{.AbnormalStatus}}</span></td>
+        {{else}}
+            <td><span style="color:green;">{{.AbnormalStatus}}</span></td>
+        {{end}}
+        <td>{{.AbnormalDetail}}</td>
+    </tr>
+    {{ end }}     
+</table>
+<h4 id="insp_9">3.10 数据库的错误日志统计</h4>
+{{ if .DatabaseErrorCounts }}
+<table>
+    <tr>
+        <th class="component">IP 地址</th>
+        <th class="component">组件</th>
+        <th>错误日志数量</th>
+    </tr>
+    {{ range .DatabaseErrorCounts }}
+    <tr>
+        <td>{{.InstAddress}}</td>
+        <td>{{.Component}}</td>
+        <td>{{.ErrorCount}}</td>
+    </tr>
+    {{ end }}     
+</table>
+{{ else }}
+<p>数据库 tidb-server 组件日志正常不存在错误信息</p>
+{{ end }}
+<h4 id="insp_10">3.11 用户对象占用空间分布</h4>
+<h5>Schema</h5>
+<table>
+    <tr>
+        <th>schema_name</th>
+        <th>index_length_GB</th>
+        <th>data_length_GB</th>
+        <th>total_GB</th>
+    </tr>
+    {{ range .DatabaseSchemaSpaces }}
+    <tr>
+        <td>{{.SchemaName}}</td>
+        <td>{{.IndexSpaceGB}}</td>
+        <td>{{.DataSpaceGB}}</td>
+        <td>{{.TotalSpaceGB}}</td>
+    </tr>
+    {{ end }}  
+</table>
+<h5>TOP 10 Table</h5>
+<table>
+    <tr>
+        <th>schema_name</th>
+        <th>table_name</th>
+        <th>rows_count</th>
+        <th>column_count</th>
+        <th>size(GB)</th>
+    </tr>
+    {{ range .DatabaseTableSpaceTops }}
+    <tr>
+        <td>{{.SchemaName}}</td>
+        <td>{{.TableName}}</td>
+        <td>{{.RowCounts}}</td>
+        <td>{{.ColumnCounts}}</td>
+        <td>{{.TotalSpaceGB}}</td>
+    </tr>
+    {{ end }}  
+</table>
+<h3>四、Performance Statistics</h3>
+<h4 id="insp_11">4.1 Performance statistics by PD</h4>
+{{ if .PerformanceStatisticsByPds }}
+<p>巡检时间窗 {{.InspectionWindowHour}} 小时</p>
+<ul>
+    <li><b>CPU usage</b>：实例 CPU 使用率，MaxMetrics 超过主机 CPU * 80% 的实例</li>
+    <li><b>99% Region heartbeat handle latency</b>：实例 region 心跳处理延迟，AvgMetrics 超过 30ms 的实例</li>
+    <li><b>Handle request duration</b>：实例处理请求的延迟，AvgMetrics 超过 30ms 的实例</li>
+    <li><b>99% WAL fsync duration</b>：实例持久化数据落盘延迟，AvgMetrics 超过 15ms 的实例</li>
+</ul>
+<table>
+    <tr>
+        <th>PD Instance</th>
+        <th>Monitoring Items</th>
+        <th>Avg Metrics</th>
+        <th>Max Metrics</th>
+        <th>参数值</th>
+        <th>建议阈值</th>
+        <th>备注</th>
+    </tr>
+    {{ range .PerformanceStatisticsByPds }}
+    <tr>
+        <td>{{.PDInstance}}</td>
+        <td>{{.MonitoringItems}}</td>
+        <td>{{.AvgMetrics}}</td>
+        <td>{{.MaxMetrics}}</td>
+        <td>{{.ParamValue}}</td>
+        <td>{{.SuggestValue}}</td>
+        <td>{{.Comment}}</td>
+    </tr>
+    {{ end }}  
+</table>
+{{ else }}
+<p>巡检时间窗 {{.InspectionWindowHour}} 小时，所有 PD 实例均未检测到异常。</p>
+<p></p>
+{{ end }}
+<h4 id="insp_12">4.2 Performance statistics by TiDB</h4>
+{{ if .PerformanceStatisticsByTidbs }}
+<p>巡检时间窗 {{.InspectionWindowHour}} 小时</p>
+<p>考虑节点实例数过多，此处只显示值得关注的实例节点，正常的节点以及监控指标项正常项目不显示</p>
+<ul>
+    <li><b>CPU usage</b>：实例 CPU 使用率，MaxMetrics 超过 CPU limits * 80% 的实例</li>
+    <li><b>Memory usage</b>：实例 Memory 使用率，MaxMetrics 超过 Memory limits * 80% 的实例</li>
+    <li><b>Commit token wait duration</b>：实例请求提交等待延迟，AvgMetrics 超过 15ms 的实例</li>
+</ul>
+<table>
+    <tr>
+        <th>TiDB Instance</th>
+        <th>Monitoring Items</th>
+        <th>Avg Metrics</th>
+        <th>Max Metrics</th>
+        <th>参数值</th>
+        <th>建议阈值</th>
+        <th>备注</th>
+    </tr>
+    {{ range .PerformanceStatisticsByTidbs }}
+    <tr>
+        <td>{{.TiDBInstance}}</td>
+        <td>{{.MonitoringItems}}</td>
+        <td>{{.AvgMetrics}}</td>
+        <td>{{.MaxMetrics}}</td>
+        <td>{{.ParamValue}}</td>
+        <td>{{.SuggestValue}}</td>
+        <td>{{.Comment}}</td>
+    </tr>
+    {{ end }}  
+</table>
+{{else}}
+<p>巡检时间窗 {{.InspectionWindowHour}} 小时，所有 TiDB 实例均未检测到异常。</p>
+{{end}}
+<h4 id="insp_13">4.3 Performance statistics by TiKV</h4>
+{{ if .PerformanceStatisticsByTikvs}}
+<p>巡检时间窗 {{.InspectionWindowHour}} 小时</p>
+<p>考虑节点实例数过多，此处只显示值得关注的实例节点，正常的节点以及监控指标项正常项目不显示</p>
+<ul>
+    <li><b>GRPC poll cpu</b>：实例 GRPC CPU 使用率，MaxMetrics 超过参数 limits * 80% 的实例</li>
+    <li><b>Scheduler worker cpu</b>：实例 Scheduler CPU 使用率，MaxMetrics 超过参数 limits * 80% 的实例</li>
+    <li><b>Unified read pool cpu</b>：实例统一线程池 CPU 使用率，MaxMetrics 超过参数 limits * 80% 的实例</li>
+    <li><b>Raft store cpu</b>：实例 raft store CPU 使用率，MaxMetrics 超过参数 limits * 80% 的实例</li>
+    <li><b>Store writer cpu</b>：实例 raft 日志 CPU 使用率，MaxMetrics 超过参数 limits * 80% 的实例</li>
+    <li><b>Async apply cpu</b>：实例 kv apply CPU 使用率，MaxMetrics 超过参数 limits * 80% 的实例</li>
+    <li><b>Scheduler discard ratio</b>：实例流控是否存在，MaxMetrics 大于参数 0 的实例</li>
+</ul>
+<table>
+    <tr>
+        <th>TiKV Instance</th>
+        <th>Monitoring Items</th>
+        <th>Avg Metrics</th>
+        <th>Max Metrics</th>
+        <th>参数值</th>
+        <th>建议阈值</th>
+        <th>备注</th>
+    </tr>
+    {{ range .PerformanceStatisticsByTikvs }}
+    <tr>
+        <td>{{.TiKVInstance}}</td>
+        <td>{{.MonitoringItems}}</td>
+        <td>{{.AvgMetrics}}</td>
+        <td>{{.MaxMetrics}}</td>
+        <td>{{.ParamValue}}</td>
+        <td>{{.SuggestValue}}</td>
+        <td>{{.Comment}}</td>
+    </tr>
+    {{ end }}  
+</table>
+{{else}}
+<p>巡检时间窗 {{.InspectionWindowHour}} 小时，所有 TiKV 实例均未检测到异常。</p>
+{{end}}
+<h3>五、SQL Statistics</h3>
+<h4 id="insp_14">5.1 SQL ordered by Elapsed Time</h4>
+<p>记录巡检时间窗 {{.InspectionWindowHour}} 小时 SQL 执行耗时排序 TOP 10</p>
+<ul>
+  <li><b>Elapsed Time(s)</b>：SQL 执行总耗时</li>
+  <li><b>Executions</b>：SQL 执行总次数</li>
+  <li><b>Elap per Exec(s)</b>：每次执行平均耗时</li>
+  <li><b>Min query Time(s)</b>：SQL 最小执行耗时</li>
+  <li><b>Max query Time(s)</b>：SQL 最大执行耗时</li>
+  <li><b>Avg total keys</b>：Coprocessor 扫过的 key 的平均数量</li>
+  <li><b>Avg processed keys</b>：Coprocessor 处理的 key 的平均数量（不包含 MVCC）</li>
+  <li><b>SQL Time Percentage</b>：巡检时间内 SQL 总体耗时占比</li>
+  <li><b>SQL Digest</b>：SQL 指纹</li>
+  <li><b>SQL Text</b>：SQL 文本</li>
+</ul>
+<table>
+    <tr>
+        <th>Elapsed Time(s)</th>
+        <th>Executions</th>
+        <th>Elap per Exec(s)</th>
+        <th>Min query Time(s)</th>
+        <th>Max query Time(s)</th>
+        <th>Avg total keys</th>
+        <th>Avg processed keys</th>
+        <th>SQL Time Percentage</th>
+        <th>SQL Digest</th>
+        <th>SQL Text</th>
+    </tr>
+    {{ range .SqlOrderedByElapsedTimes }}
+    <tr>
+        <td>{{.ElapsedTime}}</td>
+        <td>{{.Executions}}</td>
+        <td>{{.ElapPerExec}}</td>
+        <td>{{.MinQueryTime}}</td>
+        <td>{{.MaxQueryTime}}</td>
+        <td>{{.AvgTotalKeys}}</td>
+        <td>{{.AvgProcessedKeys}}</td>
+        <td>{{.SqlTimePercentage}}</td>
+        <td>{{.SqlDigest}}</td>
+        <td>
+            <div class="tooltip-wrapper">
+                <div class="truncate">{{.SqlText}}</div>
+                <div class="tooltip-bubble">
+                    {{.SqlText}}
+                </div>
+            </div>
+        </td>
+    </tr>
+    {{ end }}  
+</table>
+<h4 id="insp_15">5.2 SQL ordered by TiDB CPU Time</h4>
+{{ if .SqlOrderedByTiDBCpuTimes}}
+<p>记录巡检时间窗 {{.InspectionWindowHour}} 小时内，TiDB 维度 CPU 时间总和排名 TOP 10</p>
+<ul>
+  <li><b>CPU Time(s)</b>：SQL 执行 CPU 总消耗 (秒)</li>
+  <li><b>Exec counts per sec</b>：每秒执行 SQL 次数</li>
+  <li><b>Latency per exec(s)</b>：每次执行平均 SQL 耗时</li>
+  <li><b>Scan record per sec</b>：每秒扫描表记录数</li>
+  <li><b>Scan indexes per sec</b>：每秒扫描索引记录数</li>
+  <li><b>Plan digest counts</b>：产生执行计划数量</li>
+  <li><b>SQL Digest</b>：SQL 指纹</li>
+  <li><b>SQL Text</b>：SQL 文本(参数化后)</li>
+</ul>
+<table>
+    <tr>
+        <th>CPU Time(s)</th>
+        <th>Exec counts per sec</th>
+        <th>Latency per exec(s)</th>
+        <th>Scan record per sec</th>
+        <th>Scan indexes per sec</th>
+        <th>Plan digest counts</th>
+        <th>SQL Digest</th>
+        <th>SQL Text</th>
+    </tr>
+    {{ range .SqlOrderedByTiDBCpuTimes }}
+    <tr>
+        <td>{{.CpuTimeSec}}</td>
+        <td>{{.ExecCountsPerSec}}</td>
+        <td>{{.LatencyPerExec}}</td>
+        <td>{{.ScanRecordPerSec}}</td>
+        <td>{{.ScanIndexesPerSec}}</td>
+        <td>{{.PlanCounts}}</td>
+        <td>{{.SqlDigest}}</td>
+        <td>
+            <div class="tooltip-wrapper">
+                <div class="truncate">{{.SqlText}}</div>
+                <div class="tooltip-bubble">
+                    {{.SqlText}}
+                </div>
+            </div>
+        </td>
+    </tr>
+    {{ end }} 
+</table>
+{{else}}
+<p>记录巡检时间窗 {{.InspectionWindowHour}} 小时内，TiDB CPU 维度集群巡检未发现 SQL 语句。</p>
+{{end}}
+<h4 id="insp_16">5.3 SQL ordered by TiKV CPU Time</h4>
+{{if .SqlOrderedByTiKVCpuTimes }}
+<p>记录巡检时间窗 {{.InspectionWindowHour}} 小时内，TiKV 维度 CPU 时间总和排名 TOP 10</p>
+<ul>
+  <li><b>CPU Time(s)</b>：SQL 执行 CPU 总消耗 (秒)</li>
+  <li><b>Exec counts per sec</b>：每秒执行 SQL 次数</li>
+  <li><b>Latency per exec(s)</b>：每次执行平均 SQL 耗时</li>
+  <li><b>Scan record per sec</b>：每秒扫描表记录数</li>
+  <li><b>Scan indexes per sec</b>：每秒扫描索引记录数</li>
+  <li><b>Plan digest counts</b>：产生执行计划数量</li>
+  <li><b>SQL Digest</b>：SQL 指纹</li>
+  <li><b>SQL Text</b>：SQL 文本(参数化后)</li>
+</ul>
+<table>
+    <tr>
+        <th>CPU Time(s)</th>
+        <th>Exec counts per sec</th>
+        <th>Latency per exec(s)</th>
+        <th>Scan record per sec</th>
+        <th>Scan indexes per sec</th>
+        <th>Plan digest counts</th>
+        <th>SQL Digest</th>
+        <th>SQL Text</th>
+    </tr>
+    {{ range .SqlOrderedByTiKVCpuTimes }}
+    <tr>
+        <td>{{.CpuTimeSec}}</td>
+        <td>{{.ExecCountsPerSec}}</td>
+        <td>{{.LatencyPerExec}}</td>
+        <td>{{.ScanRecordPerSec}}</td>
+        <td>{{.ScanIndexesPerSec}}</td>
+        <td>{{.PlanCounts}}</td>
+        <td>{{.SqlDigest}}</td>
+        <td>
+            <div class="tooltip-wrapper">
+                <div class="truncate">{{.SqlText}}</div>
+                <div class="tooltip-bubble">
+                    {{.SqlText}}
+                </div>
+            </div>
+        </td>
+    </tr>
+    {{ end }} 
+</table>
+{{else}}
+<p>记录巡检时间窗 {{.InspectionWindowHour}} 小时内，TiKV CPU 集群维度巡检未发现 SQL 语句。</p>
+{{end}}
+<h4 id="insp_17">5.4 SQL ordered by Executions</h4>
+<p>记录巡检时间窗 {{.InspectionWindowHour}} 小时内 SQL 执行次数信息 TOP 10，按照从大到小的顺序排列。</p>
+<p>OLTP 系统，这部分数据比较重要；OLAP 系统重复执行的频率较低，则意义不大。</p>
+<ul>
+  <li><b>Executions</b>：SQL 执行总次数</li>
+  <li><b>Elap Per Exec(s)</b>：每次执行平均 SQL 耗时</li>
+  <li><b>Parse Per Exec(s)</b>：每次执行平均解析耗时</li>
+  <li><b>Compile Per Exec(s)</b>：每次执行平均编译耗时</li>
+  <li><b>Min query Time(s)</b>：SQL 最小执行耗时</li>
+  <li><b>Max query Time(s)</b>：SQL 最大执行耗时</li>
+  <li><b>Avg total keys</b>：Coprocessor 扫过的 key 的平均数量</li>
+  <li><b>Avg processed keys</b>：Coprocessor 处理的 key 的平均数量（不包含 MVCC）</li>
+  <li><b>SQL Time Percentage</b>：巡检时间内 SQL 总体耗时占比</li>
+  <li><b>SQL Digest</b>：SQL 指纹</li>
+  <li><b>SQL Text</b>：SQL 文本</li>
+</ul>
+<table>
+    <tr>
+        <th>Executions</th>
+        <th>Elap Per Exec(s)</th>
+        <th>Parse Per Exec(s)</th>
+        <th>Compile Per Exec(s)</th>
+        <th>Min query Time(s)</th>
+        <th>Max query Time(s)</th>
+        <th>Avg total keys</th>
+        <th>Avg processed keys</th>
+        <th>SQL Time Percentage</th>
+        <th>SQL Digest</th>
+        <th>SQL Text</th>
+    </tr>
+    {{ range .SqlOrderedByExecutions }}
+    <tr>
+        <td>{{.Executions}}</td>
+        <td>{{.ElapPerExec}}</td>
+        <td>{{.ParsePerExec}}</td>
+        <td>{{.CompilePerExec}}</td>
+        <td>{{.MinQueryTime}}</td>
+        <td>{{.MaxQueryTime}}</td>
+        <td>{{.AvgTotalKeys}}</td>
+        <td>{{.AvgProcessedKeys}}</td>
+        <td>{{.SqlTimePercentage}}</td>
+        <td>{{.SqlDigest}}</td>
+        <td>
+            <div class="tooltip-wrapper">
+                <div class="truncate">{{.SqlText}}</div>
+                <div class="tooltip-bubble">
+                    {{.SqlText}}
+                </div>
+            </div>
+        </td>
+    </tr>
+    {{ end }} 
+</table>
+<h4 id="insp_18">5.5 SQL ordered by Plans</h4>
+{{if .SqlOrderedByPlans}}
+<p>记录巡检时间窗 {{.InspectionWindowHour}} 小时内 SQL 执行计划变化 TOP 10，按照执行计划变化次数由大到小排序。</p>
+<ul>
+  <li><b>SQL plans</b>：SQL 执行计划变化数</li>
+  <li><b>Elapsed Time(s)</b>：SQL 执行总耗时</li>
+  <li><b>Executions</b>：SQL 执行总次数</li>
+  <li><b>Min sql Plan(s)</b>：耗时最小的执行计划耗时 (plan elapsed, plan digest)</li>
+  <li><b>Max sql Plan(s)</b>：耗时最大的执行计划耗时 (plan elapsed, plan digest)</li>
+  <li><b>Avg total keys</b>：Coprocessor 扫过的 key 的平均数量</li>
+  <li><b>Avg processed keys</b>：Coprocessor 处理的 key 的平均数量（不包含 MVCC）</li>
+  <li><b>SQL Time Percentage</b>：巡检时间占 SQL 总体耗时占比</li>
+  <li><b>SQL Digest</b>：SQL 指纹</li>
+  <li><b>SQL Text</b>：SQL 文本</li>
+</ul>
+<table>
+    <tr>
+        <th>SQL plans</th>
+        <th>Elapsed Time(s)</th>
+        <th>Executions</th>
+        <th>Min sql Plan(s)</th>
+        <th>Max sql Plan(s)</th>
+        <th>Avg total keys</th>
+        <th>Avg processed keys</th>
+        <th>SQL Time Percentage</th>
+        <th>SQL digest</th>
+        <th>SQL text</th>
+    </tr>
+    {{ range .SqlOrderedByPlans }}
+    <tr>
+        <td>{{.SqlPlans}}</td>
+        <td>{{.ElapsedTime}}</td>
+        <td>{{.Executions}}</td>
+        <td>{{.MinSqlPlan}}</td>
+        <td>{{.MaxSqlPlan}}</td>
+        <td>{{.AvgTotalKeys}}</td>
+        <td>{{.AvgProcessedKeys}}</td>
+        <td>{{.SqlTimePercentage}}</td>
+        <td>{{.SqlDigest}}</td>
+        <td>
+            <div class="tooltip-wrapper">
+                <div class="truncate">{{.SqlText}}</div>
+                <div class="tooltip-bubble">
+                    {{.SqlText}}
+                </div>
+            </div>
+        </td>
+    </tr>
+    {{ end }} 
+</table>
+{{else}}
+<p>记录巡检时间窗 {{.InspectionWindowHour}} 小时内，数据库集群不存在多个执行计划变化的 SQL 语句。</p>
+{{end}}
+{{ end }}

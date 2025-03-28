@@ -1,0 +1,14 @@
+{{ define "report_summary" }}
+<h3>二、检查总结</h3>
+    {{ range $index, $value := .InspectSummary }}
+        {{ if $value.IsPanic }}
+            <p><a href='#insp_{{$index}}'>{{$value.SummaryName}}</a> 检查结果：<span style='color:red;'>{{$value.SummaryResult}}</span></p>
+        {{ else }}
+            {{ if eq $value.SummaryResult "正常" }}
+                <p><a href='#insp_{{$index}}'>{{$value.SummaryName}}</a> 检查结果：<span style='color:rgb(9, 183, 9);'>{{$value.SummaryResult}}</span></p>
+            {{ else }}
+                <p><a href='#insp_{{$index}}'>{{$value.SummaryName}}</a> 检查结果：<span style='color:#0000EE;'>{{$value.SummaryResult}}</span></p>
+            {{ end }}
+        {{ end }}
+    {{ end }}
+{{ end }}
