@@ -124,7 +124,7 @@ func (a *AppTopsqlElapsed) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
-	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", true, "configure the cluster database query system cluster_statements_summary if enable history")
+	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", false, "configure the cluster database query system cluster_statements_summary if enable history")
 	return cmd
 }
 
@@ -186,7 +186,7 @@ func (a *AppTopsqlExecutions) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
-	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", true, "configure the cluster database query system cluster_statements_summary if enable history")
+	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", false, "configure the cluster database query system cluster_statements_summary if enable history")
 	return cmd
 }
 
@@ -249,7 +249,7 @@ func (a *AppTopsqlPlans) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
-	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", true, "configure the cluster database query system cluster_statements_summary if enable history")
+	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", false, "configure the cluster database query system cluster_statements_summary if enable history")
 	return cmd
 }
 
@@ -329,41 +329,67 @@ func (a *AppTopsqlCPU) Cmd() *cobra.Command {
 	return cmd
 }
 
-type AppTopsqlRunaway struct {
+type AppTopsqlDiagnosis struct {
 	*AppTopsql
-	ruPerSec      int
-	execElapsed   string
-	processedKyes int
-	consumeRu     int
-	action        string
-	instances     []string
 	concurrency   int
+	enableHistory bool
 }
 
-func (a *AppTopsql) AppTopsqlRunaway() Cmder {
-	return &AppTopsqlRunaway{AppTopsql: a}
+func (a *AppTopsql) AppTopsqlDiagnosis() Cmder {
+	return &AppTopsqlDiagnosis{AppTopsql: a}
 }
 
-func (a *AppTopsqlRunaway) Cmd() *cobra.Command {
+func (a *AppTopsqlDiagnosis) Cmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "runaway",
-		Short: "RUNAWAY Used to fast SQL flow control based on resource control and problematic statement sql digest（require >= v8.5.0）",
-		Long:  "RUNAWAY Used to fast SQL flow control based on resource control and problematic statement sql digest where the specified cluster name is located（require >= v8.5.0）",
+		Use:   "diag",
+		Short: "Diagnosis display the top 5 SQL statements that affect cluster performance",
+		Long:  "Diagnosis display the top 5 SQL statements that affect cluster performance where the specified cluster name is located",
 		PreRunE: func(cmd *cobra.Command, args []string) error {
 			if a.clusterName == "" {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
 			}
-
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			p := tea.NewProgram(topsql.NewTopsqlQueryModel(
+				a.clusterName,
+				a.nearly,
+				a.enableHistory,
+				a.startTime,
+				a.endTime,
+				a.top,
+				"DIAGNOSIS",
+				a.concurrency,
+				"",
+				a.enableSql,
+				nil,
+			))
+			teaModel, err := p.Run()
+			if err != nil {
+				return err
+			}
+			lModel := teaModel.(topsql.TopsqlQueryModel)
 
+			if lModel.Error == nil && lModel.Msgs != nil {
+				resp := lModel.Msgs.(*topsql.QueriedRespMsg)
+				if reflect.DeepEqual(resp, &topsql.QueriedRespMsg{}) {
+					fmt.Println("the cluster topsql not found, please ignore and skip")
+					return nil
+				}
+
+				topsql.PrintTopsqlDiagnosisComment()
+				fmt.Println("\ncluster topsql query content:")
+				if err := model.QueryResultFormatTableStyleWithRowsArray(resp.Columns, resp.Results); err != nil {
+					return err
+				}
+			}
 			return nil
 		},
 		TraverseChildren: true,
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
-
+	cmd.Flags().IntVar(&a.concurrency, "concurrency", 5, "configure the cluster database query component cpu time concurrency")
+	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", false, "configure the cluster database query system cluster_statements_summary if enable history")
 	return cmd
 }

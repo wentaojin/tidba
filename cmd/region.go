@@ -18,8 +18,6 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -234,9 +232,10 @@ func (a *AppRegionReplica) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
+				model.NewConsoleOutput()
 			} else {
 				// If we're in TUI mode, discard log output
-				log.SetOutput(io.Discard)
+				model.NewDisableConsoleOutput()
 			}
 
 			p := tea.NewProgram(

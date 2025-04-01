@@ -104,11 +104,12 @@ tidba[tidb-jwt00] »»» split {subCommand} ...flags
 ```
 ### TOPSQL 命令
 
-topsql 命令功能集（默认取近 30 min且不显示 sql 文本）：
+topsql 命令功能集（默认取近 30 min 且不显示 sql 文本）：
 - topsql elapsed 基于时间窗口内 sql 执行总耗时排序
 - topsql plans 基于时间窗口内产生多个执行计划的 sql 排序
 - topsql execs 基于时间窗口内 sql 执行次数排序，显示获取每类 sql 解析、编译、执行的平均时间
 - topsql cpu 基于时间窗口内 tidb / tikv 组件或者实例集群 cpu 维度排序
+- topsql diag 基于时间窗口 elapsed、plans、execs、cpu 维度，影响集群性能的 SQL TOP 5
 
 ```
 示例：
@@ -121,7 +122,46 @@ $ ./tidba topsql execs -c {clusterName} [--nearly 30 / --start {startTime} --end
 
 $ ./tidba topsql cpu -c {clusterName} --component {tidb/tikv} [--instances {instAddr:statusPort}] [--nearly 30 / --start {startTime} --end {endTime} ] --top 10 [--enable-sql] [--enable-history]
 
+$ ./tidba topsql diag -c {clusterName} [--nearly 30 / --start {startTime} --end {endTime} ] [--top 10] [--enable-sql] [--enable-history]
+
 交互式命令(除 tidba 字样之外其他保持一致)
 tidba[tidb-jwt00] »»» topsql {subCommand} ...flags
 ```
 
+### RUNAWAY 命令
+
+runaway 基于 SQL Digest 自动进行集群级别 SQL 限流，以避免同类 SQL 影响集群整体性能
+- runaway create 基于 sql digest 创建集群级别 SQL 限流
+- runaway query 查询集群当前 runaway watcher 信息
+- runaway delete 基于指定的 runaway watch id 删除 runaway watch
+
+```
+示例：
+非交互命令
+$ ./tidba runaway create -c {clusterName} --resource-group {resourceGroupName} [--ru-per-sec {ru}] [--priority {priority}] --sql-digest {sqlDigest}
+
+$ ./tidba runaway query -c {clusterName}
+
+$ ./tidba runaway delete -c {clusterName} --watch-ids {watchID1,watchID2}
+
+
+交互式命令(除 tidba 字样之外其他保持一致)
+tidba[tidb-jwt00] »»» runaway {subCommand} ...flags
+```
+
+### KILL 命令
+
+kill 功能集合：
+- kill sql 基于 sql digest 间歇性或持续性 kill session
+- kill user 基于 username  间歇性或持续性 kill 对应 user 所有 session
+
+```
+示例：
+非交互命令
+$ ./tidba kill sql -c {clusterName} --sql-digests {sqlDigest1,sqlDigest2} [--duration 30] [--interval 500] [--concurrency 5]
+
+$ ./tidba kill sql -c {clusterName} --users {username1,username2} [--duration 30] [--interval 500]  [--concurrency 5]
+
+交互式命令(除 tidba 字样之外其他保持一致)
+tidba[tidb-jwt00] »»» kill {subCommand} ...flags
+```

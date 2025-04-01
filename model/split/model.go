@@ -18,7 +18,8 @@ package split
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -52,7 +53,7 @@ func NewTableSplitModel(output string) TableSplitModel {
 }
 
 func (m TableSplitModel) Init() tea.Cmd {
-	log.Println("Starting work...")
+	log.Printf("Starting work...\n")
 	return m.spinner.Tick
 }
 

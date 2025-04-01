@@ -68,7 +68,7 @@ func QueryResultFormatTableStyleWithRowsArray(columns []string, rows [][]interfa
 	var newRows []table.Row
 	for _, row := range rows {
 		var newRow table.Row
-		for _, r := range row {
+		for _, r := range row[:len(columns)] {
 			newRow = append(newRow, r)
 		}
 		newRows = append(newRows, newRow)

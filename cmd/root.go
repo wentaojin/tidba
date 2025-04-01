@@ -82,6 +82,9 @@ func (a *App) Cmd() *cobra.Command {
 				}
 				database.Connector.AddDatabase(database.DefaultSqliteClusterName, connector)
 			}
+			if !a.disableInteractive {
+
+			}
 
 			a.history = fmt.Sprintf("%s/tidba_history", dir)
 			return nil

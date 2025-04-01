@@ -23,11 +23,13 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"reflect"
 	"sort"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/wentaojin/tidba/database/mysql"
 	"github.com/wentaojin/tidba/utils/cluster/operator"
 	"github.com/wentaojin/tidba/utils/request"
 	"github.com/wentaojin/tidba/utils/stringutil"
@@ -259,8 +261,8 @@ type Sql struct {
 	CpuTimeMs         int     `json:"cpu_time_ms"`
 	ExecCountPerSec   float64 `json:"exec_count_per_sec"`
 	DurationPerExecMs float64 `json:"duration_per_exec_ms"`
-	ScanRecordsPerSec int     `json:"scan_records_per_sec"`
-	ScanIndexesPerSec int     `json:"scan_indexes_per_sec"`
+	ScanRecordsPerSec float64 `json:"scan_records_per_sec"`
+	ScanIndexesPerSec float64 `json:"scan_indexes_per_sec"`
 	Plans             []*Plan `json:"plans"`
 }
 
@@ -271,22 +273,22 @@ type Plan struct {
 	CpuTimeMs         []int   `json:"cpu_time_ms"`
 	ExecCountPerSec   float64 `json:"exec_count_per_sec"`
 	DurationPerExecMs float64 `json:"duration_per_exec_ms"`
-	ScanRecordsPerSec int     `json:"scan_records_per_sec"`
-	ScanIndexesPerSec int     `json:"scan_indexes_per_sec"`
+	ScanRecordsPerSec float64 `json:"scan_records_per_sec"`
+	ScanIndexesPerSec float64 `json:"scan_indexes_per_sec"`
 }
 
 type CPU struct {
-	CpuTimeSec           float64
-	ExecCountsPerSec     float64
-	LatencyPerExecSec    float64
-	ScanRecordPerSec     int
-	ScanIndexesPerSec    int
-	PlanDigestCounts     int
-	MaxPlanSqlLatencySec float64
-	MinPlanSqlLatencySec float64
-	SqlLatencyPercent    string
-	SqlDigest            string
-	SqlText              string
+	CpuTimeSec           float64 `json:"cpu_time_sec"`
+	ExecCountsPerSec     float64 `json:"exec_counts_per_sec"`
+	LatencyPerExecSec    float64 `json:"latency_per_exec_sec"`
+	ScanRecordPerSec     float64 `json:"scan_record_per_sec"`
+	ScanIndexesPerSec    float64 `json:"scan_indexes_per_sec"`
+	PlanDigestCounts     int     `json:"plan_digest_counts"`
+	MaxPlanSqlLatencySec float64 `json:"max_plan_latency_sec"`
+	MinPlanSqlLatencySec float64 `json:"min_plan_latency_sec"`
+	SqlLatencyPercent    float64 `json:"percentage"`
+	SqlDigest            string  `json:"-"`
+	SqlText              string  `json:"-"`
 }
 
 type NewPlan struct {
@@ -296,11 +298,11 @@ type NewPlan struct {
 	CpuTimeSec        float64 `json:"cpu_time_ms"`
 	ExecCountPerSec   float64 `json:"exec_count_per_sec"`
 	LatencyPerExecMs  float64 `json:"duration_per_exec_ms"`
-	ScanRecordsPerSec int     `json:"scan_records_per_sec"`
-	ScanIndexesPerSec int     `json:"scan_indexes_per_sec"`
+	ScanRecordsPerSec float64 `json:"scan_records_per_sec"`
+	ScanIndexesPerSec float64 `json:"scan_indexes_per_sec"`
 }
 
-func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, component string, nearly, top int, start, end string, concurrency int, instances []string) ([]*CPU, error) {
+func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, component string, nearly, top int, start, end string, concurrency int, instances []string) ([]CPU, error) {
 	startSecs, endSecs, err := GenerateTimestampTSO(nearly, start, end)
 	if err != nil {
 		return nil, err
@@ -327,7 +329,7 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, com
 	if len(instances) > 0 {
 		differs := stringutil.CompareSliceString(instances, totalAddrs)
 		if len(differs) > 0 {
-			return nil, fmt.Errorf("the component [%s] instances [%] not founds, please review and reconfigure", component, differs)
+			return nil, fmt.Errorf("the component [%s] instances [%v] not founds, please review and reconfigure", component, differs)
 		}
 		addrs = instances
 	} else {
@@ -392,7 +394,7 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, com
 		sqlTotalLatency = sqlTotalLatency + d.CpuTimeMs
 	}
 
-	var cpus []*CPU
+	var cpus []CPU
 	for digest, sqls := range groupbySqlDigest {
 		if digest == "" {
 			continue
@@ -402,8 +404,8 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, com
 		cpuTimeMs := 0
 		execPerSec := 0.0
 		latencyPerMs := 0.0
-		scanRecordsPerSec := 0
-		scanIndexesPerSec := 0
+		scanRecordsPerSec := 0.0
+		scanIndexesPerSec := 0.0
 
 		groupbyPlanDigest := make(map[string][]*Plan)
 
@@ -434,8 +436,8 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, com
 			cpuTimeMs := 0
 			execPerSec := 0.0
 			totalLatencyPerMs := 0.0
-			scanRecordsPerSec := 0
-			scanIndexesPerSec := 0
+			scanRecordsPerSec := 0.0
+			scanIndexesPerSec := 0.0
 			var (
 				planText     string
 				timestampSec []int
@@ -474,23 +476,23 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, com
 			return newPlans[i].CpuTimeSec <= newPlans[j].CpuTimeSec
 		})
 
-		cpus = append(cpus, &CPU{
+		cpus = append(cpus, CPU{
 			CpuTimeSec:           math.Round(float64(cpuTimeMs)/1000*100) / 100,
 			ExecCountsPerSec:     math.Round(execPerSec*100) / 100,
 			LatencyPerExecSec:    math.Round(latencyPerMs/1000/float64(counts)*100) / 100,
-			ScanRecordPerSec:     scanRecordsPerSec,
-			ScanIndexesPerSec:    scanIndexesPerSec,
+			ScanRecordPerSec:     math.Round(scanRecordsPerSec*100) / 100,
+			ScanIndexesPerSec:    math.Round(scanIndexesPerSec*100) / 100,
 			PlanDigestCounts:     planUniqCounts,
 			SqlDigest:            digest,
 			SqlText:              sqls[0].SqlText,
-			SqlLatencyPercent:    fmt.Sprintf("%v%%", math.Round(float64(cpuTimeMs)/float64(sqlTotalLatency)*100)),
+			SqlLatencyPercent:    math.Round(float64(cpuTimeMs) / float64(sqlTotalLatency)),
 			MaxPlanSqlLatencySec: math.Round(newPlans[len(newPlans)-1].LatencyPerExecMs/1000*100) / 100,
 			MinPlanSqlLatencySec: math.Round(newPlans[0].LatencyPerExecMs/1000*100) / 100,
 		})
 	}
 
 	sort.Slice(cpus, func(i, j int) bool {
-		return cpus[i].CpuTimeSec <= cpus[j].CpuTimeSec
+		return cpus[i].CpuTimeSec >= cpus[j].CpuTimeSec
 	})
 
 	return cpus, nil
@@ -544,4 +546,363 @@ func Request(method, url string, body []byte) ([]byte, error) {
 	}
 
 	return respBody, nil
+}
+
+/*
+Scoring model for locating the top 5 SQLs that affect cluster performance:
+1. Standardize the score of sql digest for each dimension (scores are ranked from high to low according to the top number, for example: top 10, highest 10 points, lowest 1 point)
+2. Aggregate sql digest for each dimension and calculate the total score by weight
+- TiKV CPU 35% (component instance aggregation)
+- TiDB CPU 25% (component instance aggregation)
+- Total time 20%
+- Number of executions 15%
+- Change in execution plan 5%
+3. Sort by weighted total score and take the top. If the scores are the same, take the weighted priority (TiKV CPU -> TiDB CPU -> Total time -> Number of executions -> Execution plan)
+*/
+
+type Elapsed struct {
+	TotalLatencyRank string `json:"rank"`
+	TotalLatcncySec  string `json:"elapsed_sec"`
+	TotalExecutions  string `json:"exec_counts"`
+	AvgLatencySec    string `json:"avg_latency_sec"`
+	MinLatencySec    string `json:"min_latency_sec"`
+	MaxLatencySec    string `json:"max_latency_sec"`
+	AvgTotalKeys     string `json:"avg_total_keys"`
+	AvgProcessedKeys string `json:"avg_processed_keys"`
+	Percentage       string `json:"percentage"`
+	SqlDigest        string `json:"-"`
+	SqlText          string `json:"-"`
+	Score            int    `json:"score"`
+}
+
+func (e Elapsed) String() string {
+	if reflect.DeepEqual(e, Elapsed{}) {
+		return "NULL"
+	}
+	formattedJSON, _ := json.MarshalIndent(e, "", " ")
+	return string(formattedJSON)
+}
+
+type Executions struct {
+	TotalExecsRank       string `json:"rank"`
+	TotalExecutions      string `json:"exec_counts"`
+	AvgLatencySec        string `json:"avg_latency_sec"`
+	AvgParseLatencySec   string `json:"avg_parse_latency_sec"`
+	AvgCompileLatencySec string `json:"avg_compile_latency_sec"`
+	MinLatencySec        string `json:"min_latency_sec"`
+	MaxLatencySec        string `json:"max_latency_sec"`
+	AvgTotalKeys         string `json:"avg_total_keys"`
+	AvgProcessedKeys     string `json:"avg_processed_keys"`
+	Percentage           string `json:"percentage"`
+	SqlDigest            string `json:"-"`
+	SqlText              string `json:"-"`
+	Score                int    `json:"score"`
+}
+
+func (e Executions) String() string {
+	if reflect.DeepEqual(e, Executions{}) {
+		return "NULL"
+	}
+	formattedJSON, _ := json.MarshalIndent(e, "", " ")
+	return string(formattedJSON)
+}
+
+type Plans struct {
+	PlanCountsRank   string `json:"rank"`
+	SqlPlans         string `json:"plan_counts"`
+	ElapsedTimeSec   string `json:"elapsed_sec"`
+	Executions       string `json:"exec_counts"`
+	MinSqlPlanSec    string `json:"min_sql_plan_sec"`
+	MaxSqlPlanSec    string `json:"max_sql_plan_sec"`
+	AvgTotalKeys     string `json:"avg_total_keys"`
+	AvgProcessedKeys string `json:"avg_processed_keys"`
+	Percentage       string `json:"percentage"`
+	SqlDigest        string `json:"-"`
+	SqlText          string `json:"-"`
+	Score            int    `json:"score"`
+}
+
+func (p Plans) String() string {
+	if reflect.DeepEqual(p, Plans{}) {
+		return "NULL"
+	}
+	formattedJSON, _ := json.MarshalIndent(p, "", " ")
+	return string(formattedJSON)
+}
+
+type TiDBCpu struct {
+	CPU
+	Score int `json:"score"`
+}
+
+func (c TiDBCpu) String() string {
+	if reflect.DeepEqual(c, TiDBCpu{}) {
+		return "NULL"
+	}
+	formattedJSON, _ := json.MarshalIndent(c, "", " ")
+	return string(formattedJSON)
+}
+
+type TiKVCpu struct {
+	CPU
+	Score int `json:"score"`
+}
+
+func (c TiKVCpu) String() string {
+	if reflect.DeepEqual(c, TiKVCpu{}) {
+		return "NULL"
+	}
+	formattedJSON, _ := json.MarshalIndent(c, "", " ")
+	return string(formattedJSON)
+}
+
+type Diagnosis struct {
+	Score     float64
+	SqlDigest string
+	TiKVCpu   TiKVCpu
+	TiDBCpu   TiDBCpu
+	Elapsed   Elapsed
+	Execs     Executions
+	Plans     Plans
+	SqlText   string
+}
+
+func TopsqlDiagnosis(ctx context.Context, clusterName string, db *mysql.Database, nearly, top int, start, end string, concurrency int, enableHistory bool) ([][]interface{}, error) {
+	totalLatencySql, err := GenerateQueryWindowSqlElapsedTime(nearly, start, end, enableHistory)
+	if err != nil {
+		return nil, err
+	}
+
+	_, res, err := db.GeneralQuery(ctx, totalLatencySql)
+	if err != nil {
+		return nil, err
+	}
+	var totalLatency string
+	if len(res) == 0 {
+		return nil, fmt.Errorf("the database sql [%v] query time windows result not found", totalLatencySql)
+	} else {
+		totalLatency = res[0]["all_latency_s"]
+	}
+
+	globalSqlDigest := make(map[string]struct{})
+
+	elapsed, err := GenerateTopsqlElapsedTimeQuery(nearly, top, start, end, enableHistory, totalLatency)
+	if err != nil {
+		return nil, err
+	}
+
+	_, elapsedRes, err := db.GeneralQuery(ctx, elapsed)
+	if err != nil {
+		return nil, err
+	}
+
+	// standard score
+	var elapseds []Elapsed
+	for idx, r := range elapsedRes {
+		elapseds = append(elapseds, Elapsed{
+			TotalLatencyRank: r["total_latency_rank"],
+			TotalLatcncySec:  r["total_latency_s"],
+			TotalExecutions:  r["total_execs"],
+			AvgLatencySec:    r["avg_latency_s"],
+			MinLatencySec:    r["min_latency_s"],
+			MaxLatencySec:    r["max_latency_s"],
+			AvgTotalKeys:     r["avg_total_keys"],
+			AvgProcessedKeys: r["avg_processed_keys"],
+			Percentage:       r["percentage"],
+			SqlDigest:        r["sql_digest"],
+			SqlText:          r["sql_text"],
+			Score:            top - idx,
+		})
+		globalSqlDigest[r["sql_digest"]] = struct{}{}
+	}
+
+	execsql, err := GenerateTopsqlExecutionsQuery(nearly, top, start, end, enableHistory, totalLatency)
+	if err != nil {
+		return nil, err
+	}
+
+	_, execRes, err := db.GeneralQuery(ctx, execsql)
+	if err != nil {
+		return nil, err
+	}
+
+	// standard score
+	var executions []Executions
+	for idx, r := range execRes {
+		executions = append(executions, Executions{
+			TotalExecsRank:       r["total_execs_rank"],
+			TotalExecutions:      r["total_execs"],
+			AvgLatencySec:        r["avg_latency_s"],
+			AvgParseLatencySec:   r["avg_parse_latency_s"],
+			AvgCompileLatencySec: r["avg_compile_latency_s"],
+			MinLatencySec:        r["min_latency_s"],
+			MaxLatencySec:        r["max_latency_s"],
+			AvgTotalKeys:         r["avg_total_keys"],
+			AvgProcessedKeys:     r["avg_processed_keys"],
+			Percentage:           r["percentage"],
+			SqlDigest:            r["sql_digest"],
+			SqlText:              r["sql_text"],
+			Score:                top - idx,
+		})
+		globalSqlDigest[r["sql_digest"]] = struct{}{}
+	}
+
+	plansql, err := GenerateTopsqlPlansQuery(nearly, top, start, end, enableHistory, totalLatency)
+	if err != nil {
+		return nil, err
+	}
+
+	_, planRes, err := db.GeneralQuery(ctx, plansql)
+	if err != nil {
+		return nil, err
+	}
+
+	// standard score
+	var plans []Plans
+	for idx, r := range planRes {
+		plans = append(plans, Plans{
+			PlanCountsRank:   r["plan_counts_rank"],
+			SqlPlans:         r["plan_digest_counts"],
+			ElapsedTimeSec:   r["total_latency_s"],
+			Executions:       r["total_execs"],
+			MinSqlPlanSec:    r["plan_digest_for_min_latency"],
+			MaxSqlPlanSec:    r["plan_digest_for_max_latency"],
+			AvgTotalKeys:     r["avg_total_keys"],
+			AvgProcessedKeys: r["avg_processed_keys"],
+			Percentage:       r["percentage"],
+			SqlDigest:        r["sql_digest"],
+			SqlText:          r["sql_text"],
+			Score:            top - idx,
+		})
+		globalSqlDigest[r["sql_digest"]] = struct{}{}
+	}
+
+	cpus, err := GenerateTosqlCpuTimeByComponentServer(ctx, clusterName, operator.ComponentNameTiKV, nearly, top, start, end, concurrency, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var tikvCpus []TiKVCpu
+	for idx, c := range cpus {
+		tikvCpus = append(tikvCpus, TiKVCpu{
+			CPU:   c,
+			Score: top - idx,
+		})
+		globalSqlDigest[c.SqlDigest] = struct{}{}
+	}
+
+	cpus, err = GenerateTosqlCpuTimeByComponentServer(ctx, clusterName, operator.ComponentNameTiDB, nearly, top, start, end, concurrency, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	var tidbCPus []TiDBCpu
+	for idx, c := range cpus {
+		tidbCPus = append(tidbCPus, TiDBCpu{
+			CPU:   c,
+			Score: top - idx,
+		})
+		globalSqlDigest[c.SqlDigest] = struct{}{}
+	}
+
+	// merge sql digest and compute score
+	var diags []Diagnosis
+
+	for d, _ := range globalSqlDigest {
+		// exclude sql digest null
+		if d == "" {
+			continue
+		}
+		var diag Diagnosis
+		score := 0.0
+		diag.SqlDigest = d
+
+		for _, e := range tikvCpus {
+			if d == e.SqlDigest {
+				score = score + float64(e.Score)*0.35
+				diag.TiKVCpu = e
+				diag.SqlText = e.SqlText
+			}
+		}
+
+		for _, e := range tidbCPus {
+			if d == e.SqlDigest {
+				score = score + float64(e.Score)*0.25
+				diag.TiDBCpu = e
+				diag.SqlText = e.SqlText
+			}
+		}
+
+		for _, e := range elapseds {
+			if d == e.SqlDigest {
+				score = score + float64(e.Score)*0.20
+				diag.Elapsed = e
+				diag.SqlText = e.SqlText
+			}
+		}
+
+		for _, e := range executions {
+			if d == e.SqlDigest {
+				score = score + float64(e.Score)*0.15
+				diag.Execs = e
+				diag.SqlText = e.SqlText
+			}
+		}
+
+		for _, e := range plans {
+			if d == e.SqlDigest {
+				score = score + float64(e.Score)*0.05
+				diag.Plans = e
+				diag.SqlText = e.SqlText
+			}
+		}
+		diag.Score = math.Round(score*100) / 100
+		diags = append(diags, diag)
+	}
+
+	sort.Slice(diags, func(i, j int) bool {
+		// Sort by Score from largest to smallest
+		if diags[i].Score != diags[j].Score {
+			return diags[i].Score > diags[j].Score
+		}
+
+		// If the scores are the same, sort by TiKVCpu.Score
+		if diags[i].TiKVCpu.Score != diags[j].TiKVCpu.Score {
+			return diags[i].TiKVCpu.Score > diags[j].TiKVCpu.Score
+		}
+
+		// If TiKVCpu.Score is the same, sort by TiDBCpu.Score
+		if diags[i].TiDBCpu.Score != diags[j].TiDBCpu.Score {
+			return diags[i].TiDBCpu.Score > diags[j].TiDBCpu.Score
+		}
+
+		// If TiDBCpu.Score is the same, sort by Elapsed.Score
+		if diags[i].Elapsed.Score != diags[j].Elapsed.Score {
+			return diags[i].Elapsed.Score > diags[j].Elapsed.Score
+		}
+
+		// If Elapsed.Score is the same, sort by Execs.Score
+		if diags[i].Execs.Score != diags[j].Execs.Score {
+			return diags[i].Execs.Score > diags[j].Execs.Score
+		}
+
+		// If Execs.Score is the same, sort by Plans.Score
+		return diags[i].Plans.Score > diags[j].Plans.Score
+	})
+
+	var rows [][]interface{}
+
+	for _, d := range diags {
+		var row []interface{}
+		row = append(row, d.Score)
+		row = append(row, d.SqlDigest)
+		row = append(row, d.TiKVCpu.String())
+		row = append(row, d.TiDBCpu.String())
+		row = append(row, d.Elapsed.String())
+		row = append(row, d.Execs.String())
+		row = append(row, d.Plans.String())
+		row = append(row, d.SqlText)
+		rows = append(rows, row)
+	}
+	return rows, nil
 }

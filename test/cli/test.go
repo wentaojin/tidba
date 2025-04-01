@@ -3,7 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/fatih/color"
 	"github.com/mitchellh/go-homedir"
@@ -120,6 +121,6 @@ func (a *App) Cmd() *cobra.Command {
 func main() {
 	app := &App{}
 	if err := app.Cmd().Execute(); err != nil {
-		log.Fatal(err)
+		log.Panic().Err(err)
 	}
 }

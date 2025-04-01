@@ -18,7 +18,8 @@ package region
 import (
 	"context"
 	"fmt"
-	"log"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
@@ -79,7 +80,7 @@ func NewRegionQueryModel(clusterName string,
 }
 
 func (m RegionQueryModel) Init() tea.Cmd {
-	log.Println("Start Work...")
+	log.Printf("Start Work...\n")
 	return m.spinner.Tick
 }
 

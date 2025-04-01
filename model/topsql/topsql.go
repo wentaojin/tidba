@@ -18,12 +18,12 @@ package topsql
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/shopspring/decimal"
 	"github.com/wentaojin/tidba/database"
 	"github.com/wentaojin/tidba/database/mysql"
 	"github.com/wentaojin/tidba/model"
@@ -136,6 +136,11 @@ func (m TopsqlQueryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd,
 				submitCpuData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.component, m.concurrency, m.enableSqlDisplay, m.instances), // submit list data
 			)
+		case "DIAGNOSIS":
+			return m, tea.Batch(
+				cmd,
+				submitDiagData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.concurrency, m.enableHistory, m.enableSqlDisplay), // submit list data
+			)
 		default:
 			return m, tea.Quit
 		}
@@ -221,11 +226,11 @@ func submitElapsedData(ctx context.Context, clusterName string, nearly int,
 					if c == k {
 						// total sql time percent
 						if ind == 7 {
-							percent, err := strconv.ParseFloat(v, 64)
+							float, err := decimal.NewFromString(v)
 							if err != nil {
 								return listRespMsg{err: err}
 							}
-							row = append(row, fmt.Sprintf("%v%%", percent*100))
+							row = append(row, fmt.Sprintf("%v%%", float.Mul(decimal.NewFromInt(100))))
 						} else if ind == len(cols[1:])-1 {
 							if enableSqlDisplay {
 								row = append(row, v)
@@ -299,11 +304,11 @@ func submitExecutionsData(ctx context.Context, clusterName string, nearly int,
 					if c == k {
 						// total sql time percent
 						if ind == 8 {
-							percent, err := strconv.ParseFloat(v, 64)
+							float, err := decimal.NewFromString(v)
 							if err != nil {
 								return listRespMsg{err: err}
 							}
-							row = append(row, fmt.Sprintf("%v%%", percent*100))
+							row = append(row, fmt.Sprintf("%v%%", float.Mul(decimal.NewFromInt(100))))
 						} else if ind == len(cols[1:])-1 {
 							if enableSqlDisplay {
 								row = append(row, v)
@@ -377,11 +382,11 @@ func submitPlansData(ctx context.Context, clusterName string, nearly int,
 					if c == k {
 						// total sql time percent
 						if ind == 7 {
-							percent, err := strconv.ParseFloat(v, 64)
+							float, err := decimal.NewFromString(v)
 							if err != nil {
 								return listRespMsg{err: err}
 							}
-							row = append(row, fmt.Sprintf("%v%%", percent*100))
+							row = append(row, fmt.Sprintf("%v%%", float.Mul(decimal.NewFromInt(100))))
 						} else if ind == len(cols[1:])-1 {
 							if enableSqlDisplay {
 								row = append(row, v)
@@ -446,11 +451,9 @@ func submitCpuData(ctx context.Context, clusterName string, nearly int,
 			row = append(row, c.MinPlanSqlLatencySec)
 
 			// total sql time percent
-			percent, err := strconv.ParseFloat(c.SqlLatencyPercent, 64)
-			if err != nil {
-				return listRespMsg{err: err}
-			}
-			row = append(row, fmt.Sprintf("%v%%", percent*100))
+			float := decimal.NewFromFloat(c.SqlLatencyPercent)
+			row = append(row, fmt.Sprintf("%v%%", float.Mul(decimal.NewFromInt(100))))
+
 			row = append(row, c.SqlDigest)
 			if enableSqlDisplay {
 				row = append(row, c.SqlText)
@@ -460,6 +463,53 @@ func submitCpuData(ctx context.Context, clusterName string, nearly int,
 		return listRespMsg{msgs: &QueriedRespMsg{
 			Columns: columns,
 			Results: rows,
+		}, err: nil}
+	}
+}
+
+func submitDiagData(ctx context.Context, clusterName string, nearly int,
+	startTime string,
+	endTime string,
+	top int, concurrency int, enableHistory, enableSqlDisplay bool) tea.Cmd {
+	return func() tea.Msg {
+		connDB, err := database.Connector.GetDatabase(clusterName)
+		if err != nil {
+			return listRespMsg{err: err}
+		}
+		db := connDB.(*mysql.Database)
+
+		_, res, err := db.GeneralQuery(ctx, `show variables like 'tidb_enable_top_sql'`)
+		if err != nil {
+			return listRespMsg{err: err}
+		}
+		if len(res) == 0 {
+			return listRespMsg{err: fmt.Errorf("the dashboard topsql feature not support, please check cluster version")}
+		}
+
+		if strings.EqualFold(res[0]["Value"], "OFF") {
+			return listRespMsg{err: fmt.Errorf("the dashboard topsql feature not enabled, please [SET GLOBAL tidb_enable_top_sql = 1] enabled")}
+		}
+
+		rows, err := TopsqlDiagnosis(ctx, clusterName, db, nearly, top, startTime, endTime, concurrency, enableHistory)
+		if err != nil {
+			return listRespMsg{err: err}
+		}
+
+		columns := []string{"Score", "SQL Digest", "TiKV CPUS", "TiDB CPUS", "Elapsed", "Executions", "Plans"}
+		if enableSqlDisplay {
+			columns = append(columns, "SQL Text")
+		}
+
+		// only top 5
+		var newRows [][]interface{}
+		if len(rows) > 5 {
+			newRows = rows[:5]
+		} else {
+			newRows = rows
+		}
+		return listRespMsg{msgs: &QueriedRespMsg{
+			Columns: columns,
+			Results: newRows,
 		}, err: nil}
 	}
 }

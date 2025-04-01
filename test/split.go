@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"os"
 	"sync"
@@ -14,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
+	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -41,7 +41,7 @@ func main() {
 		opts = []tea.ProgramOption{tea.WithoutRenderer()}
 	} else {
 		// If we're in TUI mode, discard log output
-		log.SetOutput(io.Discard)
+		log.Logger = log.Output(io.Discard)
 	}
 
 	p := tea.NewProgram(newModel(), opts...)
@@ -72,7 +72,7 @@ func newModel() model {
 }
 
 func (m model) Init() tea.Cmd {
-	log.Println("Starting work...")
+	log.Printf("Starting work...")
 	return tea.Batch(
 		m.spinner.Tick,
 		listenForActivity(m.msgChan), // generate activity

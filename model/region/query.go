@@ -19,11 +19,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 
 	"github.com/tidwall/pretty"
 	"github.com/wentaojin/tidba/database/mysql"
@@ -348,7 +349,7 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 
 	if length == 0 {
 		log.Printf("[Region] query cluster major down peers not found in finished in %fs", time.Since(startTime).Seconds())
-		log.Println("[Region] the cluster region replica peers normal, not found major down peers, please ignore and skip")
+		log.Printf("[Region] the cluster region replica peers normal, not found major down peers, please ignore and skip\n")
 		return &MajorityResp{}, nil
 	}
 

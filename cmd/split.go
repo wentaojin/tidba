@@ -18,13 +18,12 @@ package cmd
 import (
 	"context"
 	"fmt"
-	"io"
-	"log"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
+	"github.com/wentaojin/tidba/model"
 	"github.com/wentaojin/tidba/model/split"
 )
 
@@ -92,9 +91,9 @@ func (a *AppSplitRange) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
+				model.NewConsoleOutput()
 			} else {
-				// If we're in TUI mode, discard log output
-				log.SetOutput(io.Discard)
+				model.NewDisableConsoleOutput()
 			}
 
 			p := tea.NewProgram(
@@ -164,9 +163,10 @@ func (a *AppSplitKey) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
+				model.NewConsoleOutput()
 			} else {
 				// If we're in TUI mode, discard log output
-				log.SetOutput(io.Discard)
+				model.NewDisableConsoleOutput()
 			}
 
 			p := tea.NewProgram(
@@ -252,9 +252,10 @@ func (a *AppSplitSampling) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
+				model.NewConsoleOutput()
 			} else {
 				// If we're in TUI mode, discard log output
-				log.SetOutput(io.Discard)
+				model.NewDisableConsoleOutput()
 			}
 
 			p := tea.NewProgram(
@@ -359,9 +360,10 @@ func (a *AppSplitEstimate) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
+				model.NewConsoleOutput()
 			} else {
 				// If we're in TUI mode, discard log output
-				log.SetOutput(io.Discard)
+				model.NewDisableConsoleOutput()
 			}
 
 			p := tea.NewProgram(

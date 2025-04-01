@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/wentaojin/tidba/database"
 	"github.com/wentaojin/tidba/database/mysql"
