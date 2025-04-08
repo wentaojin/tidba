@@ -29,10 +29,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/twotwotwo/sorts/sortutil"
 	"github.com/wentaojin/tidba/database/mysql"
+	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/utils/stringutil"
 	"golang.org/x/sync/errgroup"
 )
@@ -103,7 +102,7 @@ func (t *Task) Close() error {
 
 func (t *Task) RangeCommand(ctx context.Context) (*TableInfo, error) {
 	startTime := time.Now()
-	log.Printf("Database table [%s.%s] generate split range sql start...", t.DbName, t.TableName)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split range sql start...", t.DbName, t.TableName))
 
 	if err := t.Init(); err != nil {
 		return nil, err
@@ -163,7 +162,7 @@ GROUP BY
 		}
 	}
 
-	log.Printf("Database table [%s.%s] index columns query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] index columns query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	if len(tableInfo.HandleKey) == 0 {
 		return tableInfo, fmt.Errorf("can not found the handle column of table %s.%s", t.DbName, t.TableName)
@@ -190,7 +189,7 @@ GROUP BY
 		return tableInfo, fmt.Errorf("the database table [%s.%s] run sql [%s] failed: %v", t.DbName, t.TableName, queryStr, err)
 	}
 
-	log.Printf("Database table [%s.%s] row counts query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] row counts query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	if totalRowCount == 0 {
 		return tableInfo, fmt.Errorf("table [%s.%s] row count is 0, can not probe region range", tableInfo.DbName, tableInfo.TableName)
@@ -227,7 +226,7 @@ GROUP BY
 
 		step := totalRowCount / count
 		if step == 0 {
-			log.Printf("Database table [%s.%s] index [%s] step is zero, can not probe index region range, skip...", t.DbName, t.TableName, ind.IndexName)
+			logger.Info(fmt.Sprintf("Database table [%s.%s] index [%s] step is zero, can not probe index region range, skip...", t.DbName, t.TableName, ind.IndexName))
 			continue
 		}
 
@@ -258,10 +257,10 @@ GROUP BY
 			return tableInfo, fmt.Errorf("the database table [%s.%s] write into sqlfile [%s] failed: %v", t.DbName, t.TableName, queryStr, err)
 		}
 
-		log.Printf("Database table [%s.%s] generate index [%s] split sql finished in %fs", t.DbName, t.TableName, ind.IndexName, time.Since(indexTime).Seconds())
+		logger.Info(fmt.Sprintf("Database table [%s.%s] generate index [%s] split sql finished in %fs", t.DbName, t.TableName, ind.IndexName, time.Since(indexTime).Seconds()))
 	}
 
-	log.Printf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	// generate table data region range SQL
 	// show table regions include data region numbers and index region numbers
@@ -314,20 +313,20 @@ GROUP BY
 		return tableInfo, fmt.Errorf("the database table [%s.%s] write into sqlfile [%s] failed: %v", t.DbName, t.TableName, queryStr, err)
 	}
 
-	log.Printf("Database table [%s.%s] generate data split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate data split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	cost := time.Since(startTime).Seconds()
 
 	tableInfo.Cost = cost
 
-	log.Printf("Database table [%s.%s] generate split range sql finished in %fs", t.DbName, t.TableName, cost)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split range sql finished in %fs", t.DbName, t.TableName, cost))
 
 	return tableInfo, nil
 }
 
 func (t *Task) KeyCommand(ctx context.Context) (*TableInfo, error) {
 	startTime := time.Now()
-	log.Printf("Database table [%s.%s] generate split key sql start...", t.DbName, t.TableName)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split key sql start...", t.DbName, t.TableName))
 
 	if err := t.Init(); err != nil {
 		return nil, err
@@ -389,7 +388,7 @@ GROUP BY
 		}
 	}
 
-	log.Printf("Database table [%s.%s] index columns query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] index columns query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	if len(tableInfo.HandleKey) == 0 {
 		return tableInfo, fmt.Errorf("can not found the handle column of table %s.%s", t.DbName, t.TableName)
@@ -423,7 +422,7 @@ ORDER BY
 		return tableInfo, fmt.Errorf("the database table [%s.%s] run sql [%s] failed: %v", t.DbName, t.TableName, queryStr, err)
 	}
 
-	log.Printf("Database table [%s.%s] data start_key query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] data start_key query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	if totalKeyCounts <= 10 {
 		return tableInfo, fmt.Errorf("the database table [%s.%s] region nums is lower than 10, it's needn't split", t.DbName, t.TableName)
@@ -504,9 +503,9 @@ ORDER BY
 		if err != nil {
 			return nil, fmt.Errorf("the database table [%s.%s] data split sql file write failed: %v", t.DbName, t.TableName, err)
 		}
-		log.Printf("Database table [%s.%s] generate data split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+		logger.Info(fmt.Sprintf("Database table [%s.%s] generate data split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 	} else {
-		log.Printf("Database table [%s.%s] non-clustered needn't data split, please use SHARD_ROW_ID_BITS scatter, skip finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+		logger.Info(fmt.Sprintf("Database table [%s.%s] non-clustered needn't data split, please use SHARD_ROW_ID_BITS scatter, skip finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 	}
 
 	// generate table index split sql
@@ -581,22 +580,22 @@ ORDER BY
 		if err != nil {
 			return nil, fmt.Errorf("the database table [%s.%s] index [%s] split sql file write failed: %v", t.DbName, t.TableName, ind.IndexName, err)
 		}
-		log.Printf("Database table [%s.%s] generate index [%s] split sql finished in %fs", t.DbName, t.TableName, ind.IndexName, time.Since(indexTime).Seconds())
+		logger.Info(fmt.Sprintf("Database table [%s.%s] generate index [%s] split sql finished in %fs", t.DbName, t.TableName, ind.IndexName, time.Since(indexTime).Seconds()))
 	}
 
-	log.Printf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	cost := time.Since(startTime).Seconds()
 
 	tableInfo.Cost = cost
 
-	log.Printf("Database table [%s.%s] generate split key sql finished in %fs", t.DbName, t.TableName, cost)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split key sql finished in %fs", t.DbName, t.TableName, cost))
 	return tableInfo, nil
 }
 
 func (t *Task) SamplingCommand(ctx context.Context, indexName, newDB, newTable, newIndex, resource string, estimates int) (*TableInfo, error) {
 	startTime := time.Now()
-	log.Printf("Database table [%s.%s] generate split sampling sql start...", t.DbName, t.TableName)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split sampling sql start...", t.DbName, t.TableName))
 
 	if err := t.Init(); err != nil {
 		return nil, err
@@ -659,7 +658,7 @@ GROUP BY
 		}
 	}
 
-	log.Printf("Database table [%s.%s] index columns query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] index columns query finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	if len(tableInfo.Indexes) == 0 {
 		return nil, fmt.Errorf("the database table [%s.%s] not found index [%s]", t.DbName, t.TableName, indexName)
@@ -687,7 +686,7 @@ GROUP BY
 			}); err != nil {
 				return fmt.Errorf("the database table [%s.%s] run sql [%s] failed: %v", t.DbName, t.TableName, queryStr, err)
 			}
-			log.Printf("Database table [%s.%s] query index column distinct values finished in %fs", t.DbName, t.TableName, time.Since(sTime).Seconds())
+			logger.Info(fmt.Sprintf("Database table [%s.%s] query index column distinct values finished in %fs", t.DbName, t.TableName, time.Since(sTime).Seconds()))
 			return nil
 		})
 
@@ -727,13 +726,13 @@ GROUP BY
 		if err != nil {
 			return nil, err
 		}
-		log.Printf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+		logger.Info(fmt.Sprintf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 		cost := time.Since(startTime).Seconds()
 
 		tableInfo.Cost = cost
 
-		log.Printf("Database table [%s.%s] generate split sampling sql finished in %fs", t.DbName, t.TableName, cost)
+		logger.Info(fmt.Sprintf("Database table [%s.%s] generate split sampling sql finished in %fs", t.DbName, t.TableName, cost))
 		return tableInfo, nil
 	}
 
@@ -761,7 +760,7 @@ GROUP BY
 			return err
 		}
 		indColumnDistCounts = val
-		log.Printf("Database table [%s.%s] query index distinct counts [%d] finished in %fs", t.DbName, t.TableName, val, time.Since(sTime).Seconds())
+		logger.Info(fmt.Sprintf("Database table [%s.%s] query index distinct counts [%d] finished in %fs", t.DbName, t.TableName, val, time.Since(sTime).Seconds()))
 		return nil
 	})
 
@@ -802,7 +801,7 @@ WHERE
 	}); err != nil {
 		return nil, fmt.Errorf("the database table [%s.%s] run sql [%s] failed: %v", t.DbName, t.TableName, queryStr, err)
 	}
-	log.Printf("Database table [%s.%s] query index column distinct values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] query index column distinct values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	// generate split index sql
 	queryTime = time.Now()
@@ -821,11 +820,11 @@ WHERE
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	cost := time.Since(startTime).Seconds()
 	tableInfo.Cost = cost
-	log.Printf("Database table [%s.%s] generate split key sql finished in %fs", t.DbName, t.TableName, cost)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split key sql finished in %fs", t.DbName, t.TableName, cost))
 	return tableInfo, nil
 }
 
@@ -842,7 +841,7 @@ func (t *Task) calculateRegions(ctx context.Context, tableInfo *TableInfo, estim
 	if err != nil {
 		return 0, err
 	}
-	log.Printf("Database table [%s.%s] query table count rows finished in %fs", t.DbName, t.TableName, time.Since(sTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] query table count rows finished in %fs", t.DbName, t.TableName, time.Since(sTime).Seconds()))
 
 	sTime = time.Now()
 	querySql = fmt.Sprintf("SHOW TABLE `%s`.`%s` INDEX `%s` REGIONS", t.DbName, t.TableName, tableInfo.Indexes[0].IndexName)
@@ -857,7 +856,7 @@ func (t *Task) calculateRegions(ctx context.Context, tableInfo *TableInfo, estim
 	if indexRegions < 1 {
 		indexRegions = 1
 	}
-	log.Printf("Database table [%s.%s] query index [%s] region counts finished in %fs", t.DbName, t.TableName, tableInfo.Indexes[0].IndexName, time.Since(sTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] query index [%s] region counts finished in %fs", t.DbName, t.TableName, tableInfo.Indexes[0].IndexName, time.Since(sTime).Seconds()))
 
 	capacity := rowCounts / indexRegions
 	// To prevent too little data stored in the region, generally a region can store 10,000 indexes,
@@ -870,14 +869,14 @@ func (t *Task) calculateRegions(ctx context.Context, tableInfo *TableInfo, estim
 	if regionCounts < 1 {
 		regionCounts = 1
 	}
-	log.Printf("Database table [%s.%s] calculate index region counts [%v] finished in %fs", t.DbName, t.TableName, regionCounts, time.Since(calTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] calculate index region counts [%v] finished in %fs", t.DbName, t.TableName, regionCounts, time.Since(calTime).Seconds()))
 
 	return regionCounts, nil
 }
 
 func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB, newTable, newIndex string, estimateRow, estimateSize, concurrency, regionSize int) (*TableInfo, error) {
 	startTime := time.Now()
-	log.Printf("Database table [%s.%s] generate split sampling sql start...", t.DbName, t.TableName)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split sampling sql start...", t.DbName, t.TableName))
 
 	if err := t.Init(); err != nil {
 		return nil, err
@@ -914,13 +913,13 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 	}); err != nil {
 		return tableInfo, fmt.Errorf("the database table [%s.%s] run sql [%s] failed: %v", t.DbName, t.TableName, queryStr, err)
 	}
-	log.Printf("Database table [%s.%s] query esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] query esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	// return order string
 	var sortConVals []string
 	queryTime = time.Now()
 	sortConVals = con.SortList()
-	log.Printf("Database table [%s.%s] sort and deduplication esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] sort and deduplication esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
 	sortConValCounts := len(sortConVals)
@@ -941,8 +940,8 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 		colsInfo[i] = append(colsInfo[i], stringutil.Paginate(sortConVals, offset, concurrency)...)
 		offset = offset + concurrency
 	}
-	log.Printf("Database table [%s.%s] query esitmate column value counts [%d] finished in %fs", t.DbName, t.TableName, sortConValCounts, time.Since(queryTime).Seconds())
-	log.Printf("Database table [%s.%s] split paginate esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] query esitmate column value counts [%d] finished in %fs", t.DbName, t.TableName, sortConValCounts, time.Since(queryTime).Seconds()))
+	logger.Info(fmt.Sprintf("Database table [%s.%s] split paginate esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	// store column values include repeat(fill)
 	queryTime = time.Now()
@@ -960,7 +959,7 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 	if err := g.Wait(); err != nil {
 		return nil, err
 	}
-	log.Printf("Database table [%s.%s] generate new estimate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate new estimate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	// resort newColumnVals order by asc
 	queryTime = time.Now()
@@ -969,7 +968,7 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 		newColumnVals = append(newColumnVals, c.([]string)...)
 	}
 	sortutil.Strings(newColumnVals)
-	log.Printf("Database table [%s.%s] sort new esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] sort new esitmate column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
 	// determine whether the sorted value is equal to before
@@ -988,9 +987,9 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 	// split array by segments
 	splitNums := math.Ceil(float64(newColumnsCounts) / oneRegionStep)
 
-	log.Printf("Database table [%s.%s] generate new estimate column value counts [%d] finished in %fs", t.DbName, t.TableName, newColumnsCounts, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate new estimate column value counts [%d] finished in %fs", t.DbName, t.TableName, newColumnsCounts, time.Since(queryTime).Seconds()))
 
-	log.Printf("Database table [%s.%s] estimate new region counts [%f] region step [%f] split nums [%f] finished in %fs", t.DbName, t.TableName, regionCounts, oneRegionStep, splitNums, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] estimate new region counts [%f] region step [%f] split nums [%f] finished in %fs", t.DbName, t.TableName, regionCounts, oneRegionStep, splitNums, time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
 	var splitRegionInfos []string
@@ -1007,7 +1006,7 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 		splitRegionInfos = append(splitRegionInfos, stringutil.Paginate(newColumnVals, offset, int(oneRegionStep))[0])
 		offset = offset + int(oneRegionStep)
 	}
-	log.Printf("Database table [%s.%s] generate new region start_key column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate new region start_key column values finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
 	sqlBuf := bytes.NewBuffer(nil)
@@ -1025,10 +1024,10 @@ func (t *Task) EstimateCommand(ctx context.Context, columnNames []string, newDB,
 	if _, err := t.Write(strings.TrimRight(sqlBuf.String(), ",") + ";\n\n"); err != nil {
 		return nil, err
 	}
-	log.Printf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate index split sql finished in %fs", t.DbName, t.TableName, time.Since(queryTime).Seconds()))
 
 	cost := time.Since(startTime).Seconds()
 	tableInfo.Cost = cost
-	log.Printf("Database table [%s.%s] generate split estimate sql finished in %fs", t.DbName, t.TableName, cost)
+	logger.Info(fmt.Sprintf("Database table [%s.%s] generate split estimate sql finished in %fs", t.DbName, t.TableName, cost))
 	return tableInfo, nil
 }

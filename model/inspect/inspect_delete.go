@@ -98,7 +98,7 @@ func (m InspectDeleteModel) View() string {
 		)
 	default:
 		if m.Error != nil {
-			return fmt.Sprintf("\n❌ Deleted error: %s\n", m.Error.Error())
+			return "\n❌ Deleted failed!\n\n"
 		}
 		return "✅ Deleted successfully!\n\n"
 	}

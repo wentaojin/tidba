@@ -25,6 +25,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/wentaojin/tidba/database"
 	"github.com/wentaojin/tidba/database/mysql"
+	"github.com/wentaojin/tidba/database/sqlite"
 	"github.com/wentaojin/tidba/model"
 	"github.com/wentaojin/tidba/utils/stringutil"
 )
@@ -38,17 +39,20 @@ type SqlRunawayModel struct {
 	resourceGroup string
 	ruPerSec      int
 	priority      string
-	watchID       []int
+	watchIDs      []int
+	sqlText       string
+	action        string
 	spinner       spinner.Model
 	mode          string
 	Msgs          interface{}
 	Error         error
 }
 
-func NewSqlRunawayModel(clusterName string, sqlDigest string,
+func NewSqlRunawayModel(clusterName string,
+	sqlDigest string,
 	resourceGroup string,
 	ruPerSec int,
-	priority string, command string, ruID []int) SqlRunawayModel {
+	priority string, command, sqlText, action string, watchIDs []int) SqlRunawayModel {
 	sp := spinner.New()
 	sp.Spinner = spinner.Line
 	sp.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("206"))
@@ -64,7 +68,10 @@ func NewSqlRunawayModel(clusterName string, sqlDigest string,
 		ruPerSec:      ruPerSec,
 		priority:      priority,
 		command:       command,
-		watchID:       ruID,
+		watchIDs:      watchIDs,
+		sqlDigest:     sqlDigest,
+		sqlText:       sqlText,
+		action:        action,
 		mode:          model.BubblesModeQuering,
 	}
 }
@@ -103,7 +110,7 @@ func (m SqlRunawayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "CREATE":
 			return m, tea.Batch(
 				cmd,
-				submitRunawayCreateData(m.ctx, m.clusterName, m.resourceGroup, m.ruPerSec, m.priority, m.sqlDigest), // submit list data
+				submitRunawayCreateData(m.ctx, m.clusterName, m.resourceGroup, m.sqlDigest, m.priority, m.sqlText, m.action, m.ruPerSec), // submit list data
 			)
 		case "QUERY":
 			return m, tea.Batch(
@@ -113,7 +120,7 @@ func (m SqlRunawayModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "DELETE":
 			return m, tea.Batch(
 				cmd,
-				submitRunawayDeleteData(m.ctx, m.clusterName, m.watchID), // submit list data
+				submitRunawayDeleteData(m.ctx, m.clusterName, m.watchIDs), // submit list data
 			)
 		default:
 			return m, tea.Quit
@@ -131,7 +138,7 @@ func (m SqlRunawayModel) View() string {
 		)
 	default:
 		if m.Error != nil {
-			return fmt.Sprintf("\n❌ Executed error: %s\n", m.Error.Error())
+			return "❌ Executed failed!\n\n"
 		}
 		return "✅ Executed successfully!\n\n"
 	}
@@ -147,9 +154,9 @@ type QueriedRespMsg struct {
 	Results [][]interface{}
 }
 
-func submitRunawayCreateData(ctx context.Context, clusterName string, resourceGroup string, ruPerSec int, priority string, sqlDigest string) tea.Cmd {
+func submitRunawayCreateData(ctx context.Context, clusterName string, resourceGroup string, sqlDigest string, priority, sqlText, action string, ruPerSec int) tea.Cmd {
 	return func() tea.Msg {
-		cols, results, err := TopsqlRunaway(ctx, clusterName, resourceGroup, sqlDigest, priority, ruPerSec)
+		cols, results, err := TopsqlRunaway(ctx, clusterName, resourceGroup, sqlDigest, priority, sqlText, action, ruPerSec)
 		if err != nil {
 			return listRunawayMsg{err: err}
 		}
@@ -179,10 +186,10 @@ func submitRunawayQueryData(ctx context.Context, clusterName string) tea.Cmd {
 			return listRunawayMsg{err: err}
 		}
 		db := connDB.(*mysql.Database)
-
-		_, res, err := db.GeneralQuery(ctx, `select version() AS VERSION`)
+		queryStr := `select version() AS VERSION`
+		_, res, err := db.GeneralQuery(ctx, queryStr)
 		if err != nil {
-			return listRunawayMsg{err: err}
+			return listRunawayMsg{err: fmt.Errorf("the query sql [%v] run failed: %v", queryStr, err)}
 		}
 		vers := strings.Split(res[0]["VERSION"], "-")
 
@@ -190,9 +197,24 @@ func submitRunawayQueryData(ctx context.Context, clusterName string) tea.Cmd {
 			return listRunawayMsg{err: fmt.Errorf("the cluster [%s] database version [%s] not meet requirement, require version >= v8.5.0, need use SWITCH_GROUP feature", clusterName, vers[len(vers)-1])}
 		}
 
-		cols, res, err := db.GeneralQuery(ctx, `SELECT * FROM INFORMATION_SCHEMA.RUNAWAY_WATCHES ORDER BY id`)
+		queryStr = `SELECT
+rw.ID,
+rw.RESOURCE_GROUP_NAME AS RESOURCE_GROUP,
+rw.START_TIME,
+rw.END_TIME,
+rg.RU_PER_SEC,
+rg.PRIORITY,
+rg.QUERY_LIMIT,
+rw.ACTION,
+rw.WATCH_TEXT
+FROM 
+INFORMATION_SCHEMA.RUNAWAY_WATCHES rw,
+INFORMATION_SCHEMA.RESOURCE_GROUPS rg
+WHERE
+rw.RESOURCE_GROUP_NAME = rg.NAME`
+		cols, res, err := db.GeneralQuery(ctx, queryStr)
 		if err != nil {
-			return listRunawayMsg{err: err}
+			return listRunawayMsg{err: fmt.Errorf("the query sql [%v] run failed: %v", queryStr, err)}
 		}
 
 		var rows [][]interface{}
@@ -232,13 +254,46 @@ func submitRunawayDeleteData(ctx context.Context, clusterName string, ids []int)
 			return listRunawayMsg{err: fmt.Errorf("the cluster [%s] database version [%s] not meet requirement, require version >= v8.5.0, need use SWITCH_GROUP feature", clusterName, vers[len(vers)-1])}
 		}
 
+		metaDB, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
+		if err != nil {
+			return listRunawayMsg{err: err}
+		}
+		meta := metaDB.(*sqlite.Database)
+
+		rc, err := meta.GetResourceGroup(ctx, clusterName)
+		if err != nil {
+			return listRunawayMsg{err: err}
+		}
+
 		for _, id := range ids {
 			if _, err := db.ExecContext(ctx, fmt.Sprintf(`QUERY WATCH REMOVE %d`, id)); err != nil {
 				return listRunawayMsg{err: err}
 			}
 		}
+		if rc.ResourceGroupName != "" {
+			if _, err := db.ExecContext(ctx, fmt.Sprintf(`DROP RESOURCE GROUP %s`, rc.ResourceGroupName)); err != nil {
+				return listRunawayMsg{err: err}
+			}
+			if _, err := meta.DeleteResourceGroup(ctx, clusterName); err != nil {
+				return listRunawayMsg{err: err}
+			}
+		}
 
-		cols, res, err := db.GeneralQuery(ctx, `SELECT * FROM INFORMATION_SCHEMA.RUNAWAY_WATCHES ORDER BY id`)
+		cols, res, err := db.GeneralQuery(ctx, `SELECT
+rw.ID,
+rw.RESOURCE_GROUP_NAME AS RESOURCE_GROUP,
+rw.START_TIME,
+rw.END_TIME,
+rg.RU_PER_SEC,
+rg.PRIORITY,
+rg.QUERY_LIMIT,
+rw.ACTION,
+rw.WATCH_TEXT
+FROM 
+INFORMATION_SCHEMA.RUNAWAY_WATCHES rw,
+INFORMATION_SCHEMA.RESOURCE_GROUPS rg
+WHERE
+rw.RESOURCE_GROUP_NAME = rg.NAME`)
 		if err != nil {
 			return listRunawayMsg{err: err}
 		}

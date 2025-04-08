@@ -98,7 +98,7 @@ func (m InspectQueryModel) View() string {
 		)
 	default:
 		if m.Error != nil {
-			return fmt.Sprintf("\n❌ Queried error: %s\n", m.Error.Error())
+			return "❌ Queried failed!\n\n"
 		}
 		if m.Msg.String() == "" {
 			return "\n❌ Queried error: not found cluster inspect config content"

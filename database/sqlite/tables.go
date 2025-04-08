@@ -56,3 +56,10 @@ func (i *Inspect) String() string {
 	val, _ := json.MarshalIndent(i, "", " ")
 	return string(val)
 }
+
+type ResourceGroup struct {
+	ID                uint64 `gorm:"primarykey;autoIncrement;comment:id" json:"id"`
+	ClusterName       string `gorm:"not null;type:varchar(120);uniqueIndex:uniq_cluster_name;comment:name of cluster" json:"clusterName"`
+	ResourceGroupName string `gorm:"not null;type:varchar(120);comment:name of switch resource group" json:"resourceGroupName"`
+	*Entity
+}

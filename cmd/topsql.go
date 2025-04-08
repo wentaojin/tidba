@@ -83,6 +83,15 @@ func (a *AppTopsqlElapsed) Cmd() *cobra.Command {
 			if a.clusterName == "" {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
 			}
+			switch {
+			case a.startTime != "" && a.endTime == "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime == "" && a.endTime != "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime != "" && a.endTime != "":
+				// reset nearly 30 minutes options, --start and --end have higher priority
+				a.nearly = 0
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -104,8 +113,10 @@ func (a *AppTopsqlElapsed) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(topsql.TopsqlQueryModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*topsql.QueriedRespMsg)
 				if reflect.DeepEqual(resp, &topsql.QueriedRespMsg{}) {
 					fmt.Println("the cluster topsql not found, please ignore and skip")
@@ -146,6 +157,15 @@ func (a *AppTopsqlExecutions) Cmd() *cobra.Command {
 			if a.clusterName == "" {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
 			}
+			switch {
+			case a.startTime != "" && a.endTime == "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime == "" && a.endTime != "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime != "" && a.endTime != "":
+				// reset nearly 30 minutes options, --start and --end have higher priority
+				a.nearly = 0
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -167,8 +187,10 @@ func (a *AppTopsqlExecutions) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(topsql.TopsqlQueryModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*topsql.QueriedRespMsg)
 				if reflect.DeepEqual(resp, &topsql.QueriedRespMsg{}) {
 					fmt.Println("the cluster topsql not found, please ignore and skip")
@@ -208,6 +230,15 @@ func (a *AppTopsqlPlans) Cmd() *cobra.Command {
 			if a.clusterName == "" {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
 			}
+			switch {
+			case a.startTime != "" && a.endTime == "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime == "" && a.endTime != "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime != "" && a.endTime != "":
+				// reset nearly 30 minutes options, --start and --end have higher priority
+				a.nearly = 0
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -229,8 +260,10 @@ func (a *AppTopsqlPlans) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(topsql.TopsqlQueryModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*topsql.QueriedRespMsg)
 				if reflect.DeepEqual(resp, &topsql.QueriedRespMsg{}) {
 					fmt.Println("the cluster topsql not found, please ignore and skip")
@@ -276,6 +309,15 @@ func (a *AppTopsqlCPU) Cmd() *cobra.Command {
 			if !strings.EqualFold(a.component, operator.ComponentNameTiDB) && !strings.EqualFold(a.component, operator.ComponentNameTiKV) {
 				return fmt.Errorf("unknown component [%s], only support options for tidb / tikv", a.component)
 			}
+			switch {
+			case a.startTime != "" && a.endTime == "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime == "" && a.endTime != "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime != "" && a.endTime != "":
+				// reset nearly 30 minutes options, --start and --end have higher priority
+				a.nearly = 0
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -297,8 +339,10 @@ func (a *AppTopsqlCPU) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(topsql.TopsqlQueryModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*topsql.QueriedRespMsg)
 				if reflect.DeepEqual(resp, &topsql.QueriedRespMsg{}) {
 					fmt.Println("the cluster topsql not found, please ignore and skip")
@@ -348,6 +392,15 @@ func (a *AppTopsqlDiagnosis) Cmd() *cobra.Command {
 			if a.clusterName == "" {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
 			}
+			switch {
+			case a.startTime != "" && a.endTime == "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime == "" && a.endTime != "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime != "" && a.endTime != "":
+				// reset nearly 30 minutes options, --start and --end have higher priority
+				a.nearly = 0
+			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -369,8 +422,10 @@ func (a *AppTopsqlDiagnosis) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(topsql.TopsqlQueryModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*topsql.QueriedRespMsg)
 				if reflect.DeepEqual(resp, &topsql.QueriedRespMsg{}) {
 					fmt.Println("the cluster topsql not found, please ignore and skip")
@@ -390,6 +445,92 @@ func (a *AppTopsqlDiagnosis) Cmd() *cobra.Command {
 		SilenceUsage:     true,
 	}
 	cmd.Flags().IntVar(&a.concurrency, "concurrency", 5, "configure the cluster database query component cpu time concurrency")
+	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", false, "configure the cluster database query system cluster_statements_summary if enable history")
+	return cmd
+}
+
+type AppTopsqlMemory struct {
+	*AppTopsql
+	enableHistory bool
+}
+
+func (a *AppTopsql) AppTopsqlMemory() Cmder {
+	return &AppTopsqlMemory{AppTopsql: a}
+}
+
+func (a *AppTopsqlMemory) Cmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "memory",
+		Short: "Memory display the top SQL statements that affect cluster memory usage",
+		Long:  "Memory display the top SQL statements that affect cluster memory usage where the specified cluster name is located",
+		PreRunE: func(cmd *cobra.Command, args []string) error {
+			if a.clusterName == "" {
+				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
+			}
+			switch {
+			case a.startTime != "" && a.endTime == "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime == "" && a.endTime != "":
+				return fmt.Errorf("to avoid the query range being too large, you need to explicitly set the flag [--start] and flag [--end] query range")
+			case a.startTime != "" && a.endTime != "":
+				// reset nearly 30 minutes options, --start and --end have higher priority
+				a.nearly = 0
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			p := tea.NewProgram(topsql.NewTopsqlQueryModel(
+				a.clusterName,
+				a.nearly,
+				a.enableHistory,
+				a.startTime,
+				a.endTime,
+				a.top,
+				"MEMORY",
+				0,
+				"",
+				a.enableSql,
+				nil,
+			))
+			teaModel, err := p.Run()
+			if err != nil {
+				return err
+			}
+			lModel := teaModel.(topsql.TopsqlQueryModel)
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil {
+				resp := lModel.Msgs.([]*topsql.QueriedRespMsg)
+				if len(resp) == 0 {
+					fmt.Println("the cluster topsql not found, please ignore and skip")
+					return nil
+				}
+				for _, r := range resp {
+					if r.MsgType == topsql.DefaultMemoryMsgType {
+						topsql.PrintTopsqlMemoryUsageComment(a.top)
+						fmt.Println("\ncluster topsql memory query content:")
+						if err := model.QueryResultFormatTableStyleWithRowsArray(r.Columns, r.Results); err != nil {
+							return err
+						}
+					} else if r.MsgType == topsql.DefaultPlanCacheMsgType {
+						topsql.PrintTopsqlPlanCacheUsageComment(a.top)
+						fmt.Println("\ncluster topsql plan cache query content:")
+						if err := model.QueryResultFormatTableStyleWithRowsArray(r.Columns, r.Results); err != nil {
+							return err
+						}
+					} else {
+						return fmt.Errorf("unknown topsql query msg type [%s]", r.MsgType)
+					}
+				}
+
+			}
+			return nil
+		},
+		TraverseChildren: true,
+		SilenceErrors:    true,
+		SilenceUsage:     true,
+	}
 	cmd.Flags().BoolVar(&a.enableHistory, "enable-history", false, "configure the cluster database query system cluster_statements_summary if enable history")
 	return cmd
 }

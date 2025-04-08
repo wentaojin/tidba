@@ -24,10 +24,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/tidwall/pretty"
 	"github.com/wentaojin/tidba/database/mysql"
+	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/utils/cluster/operator"
 	"golang.org/x/sync/errgroup"
 )
@@ -255,14 +254,14 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[Region] query cluster regions info in finished %fs", time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("[Region] query cluster regions info in finished %fs", time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
 	cfgReplica, err := getClusterConfigReplica(pdAddr)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[Region] query cluster config replica info in finished %fs", time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("[Region] query cluster config replica info in finished %fs", time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
 	allStores, err := getClusterStores(pdAddr)
@@ -289,7 +288,7 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 		}
 	}
 
-	log.Printf("[Region] query cluster down store info in finished %fs", time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("[Region] query cluster down store info in finished %fs", time.Since(queryTime).Seconds()))
 
 	queryTime = time.Now()
 	g := &errgroup.Group{}
@@ -337,7 +336,7 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 		return nil, err
 	}
 
-	log.Printf("[Region] query cluster major down peers info in finished %fs", time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("[Region] query cluster major down peers info in finished %fs", time.Since(queryTime).Seconds()))
 
 	var downRegionIds []string
 	length := 0
@@ -348,8 +347,8 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 	})
 
 	if length == 0 {
-		log.Printf("[Region] query cluster major down peers not found in finished in %fs", time.Since(startTime).Seconds())
-		log.Printf("[Region] the cluster region replica peers normal, not found major down peers, please ignore and skip\n")
+		logger.Info(fmt.Sprintf("[Region] query cluster major down peers not found in finished in %fs", time.Since(startTime).Seconds()))
+		logger.Info("[Region] the cluster region replica peers normal, not found major down peers, please ignore and skip")
 		return &MajorityResp{}, nil
 	}
 
@@ -359,7 +358,7 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("[Region] query cluster major down peers database information in finished %fs", time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("[Region] query cluster major down peers database information in finished %fs", time.Since(queryTime).Seconds()))
 
 	// Ignore Region information that has been deleted but not GCed (regions with empty query results in the tidb interface)
 	var (
@@ -399,9 +398,9 @@ func QueryMarjorDownRegionPeers(ctx context.Context, clusterName string, db *mys
 		return true
 	})
 
-	log.Printf("[Region] generate cluster major down peers database information in finished %fs", time.Since(queryTime).Seconds())
+	logger.Info(fmt.Sprintf("[Region] generate cluster major down peers database information in finished %fs", time.Since(queryTime).Seconds()))
 
-	log.Printf("[Region] generate cluster major down peers informations in completed %fs", time.Since(startTime).Seconds())
+	logger.Info(fmt.Sprintf("[Region] generate cluster major down peers informations in completed %fs", time.Since(startTime).Seconds()))
 
 	return &MajorityResp{
 		ReplicaCounts:             cfgReplica.MaxReplicas,

@@ -19,12 +19,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/model"
+	"go.uber.org/zap"
 )
 
 type TableSplitModel struct {
@@ -53,7 +53,7 @@ func NewTableSplitModel(output string) TableSplitModel {
 }
 
 func (m TableSplitModel) Init() tea.Cmd {
-	log.Printf("Starting work...\n")
+	logger.Info("Starting work...")
 	return m.spinner.Tick
 }
 
@@ -73,7 +73,7 @@ func (m TableSplitModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case SplitRespMsg:
 		m.mode = model.BubblesModeSplited
 		if msg.Err != nil {
-			log.Printf("Split table error: %v", msg.Err)
+			logger.Error("split error", zap.Error(msg.Err))
 			m.Err = fmt.Errorf("split table error: %v", msg.Err)
 		}
 		return m, tea.Quit

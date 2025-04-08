@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/model/kill"
 )
 
@@ -85,8 +86,9 @@ func (a *AppKillSql) Cmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			logger.NewLoggerConsoleOutput(true)
+			defer logger.Sync()
 			return kill.GenerateKillSessionSqlBySqlDigest(context.Background(), a.clusterName, a.sqlDigests, a.duration, a.interval, a.concurrency)
-
 		},
 		TraverseChildren: true,
 		SilenceErrors:    true,
@@ -125,6 +127,8 @@ func (a *AppKillUsername) Cmd() *cobra.Command {
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			logger.NewLoggerConsoleOutput(true)
+			defer logger.Sync()
 			return kill.GenerateKillSessionSqlByUsername(context.Background(), a.clusterName, a.usernames, a.duration, a.interval, a.concurrency)
 		},
 		TraverseChildren: true,

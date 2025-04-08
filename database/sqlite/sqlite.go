@@ -56,6 +56,7 @@ func NewDatabase(dbPath string) (*Database, error) {
 	if err := sqlitedb.AutoMigrate(
 		&Cluster{},
 		&Inspect{},
+		&ResourceGroup{},
 	); err != nil {
 		return nil, fmt.Errorf("migrate the sqlite table error: [%s]", err)
 	}
@@ -214,6 +215,63 @@ func (d *Database) GetInspect(ctx context.Context, clusterName string) (*Inspect
 	err := d.DB.Model(&Inspect{}).Where("cluster_name = ?", clusterName).Find(&data).Limit(1).Error
 	if err != nil {
 		return nil, fmt.Errorf("get table [%s] record failed: %v", d.InspectTableName(ctx), err)
+	}
+	return data, nil
+}
+
+func (d *Database) ResourceGroupTableName(ctx context.Context) string {
+	return d.DB.NamingStrategy.TableName(reflect.TypeOf(ResourceGroup{}).Name())
+}
+
+func (d *Database) CreateResourceGroup(ctx context.Context, data *ResourceGroup) (*ResourceGroup, error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	err := d.DB.Create(data).Error
+	if err != nil {
+		return nil, fmt.Errorf("create table [%s] record failed: %v", d.ResourceGroupTableName(ctx), err)
+	}
+	return data, nil
+}
+
+func (d *Database) DeleteResourceGroup(ctx context.Context, clusterName string) (*ResourceGroup, error) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+
+	var data *ResourceGroup
+	if err := d.DB.Transaction(func(tx *gorm.DB) error {
+		err := tx.Model(&ResourceGroup{}).Where("cluster_name = ?", clusterName).Find(&data).Limit(1).Error
+		if err != nil {
+			return fmt.Errorf("get table [%s] record failed: %v", d.ResourceGroupTableName(ctx), err)
+		}
+		err = tx.Where("cluster_name = ?", clusterName).Delete(&ResourceGroup{}).Error
+		if err != nil {
+			return fmt.Errorf("delete table [%s] record failed: %v", d.ResourceGroupTableName(ctx), err)
+		}
+		return nil
+	}); err != nil {
+		return data, err
+	}
+	return data, nil
+}
+
+func (d *Database) UpdateResourceGroup(ctx context.Context, clusterName string, updates map[string]interface{}) error {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
+	err := d.DB.Model(&ResourceGroup{}).Where("cluster_name = ?", clusterName).Updates(updates).Error
+	if err != nil {
+		return fmt.Errorf("update table [%s] record failed: %v", d.ResourceGroupTableName(ctx), err)
+	}
+	return nil
+}
+
+func (d *Database) GetResourceGroup(ctx context.Context, clusterName string) (*ResourceGroup, error) {
+	d.mutex.RLock()
+	defer d.mutex.RUnlock()
+
+	var data *ResourceGroup
+	err := d.DB.Model(&ResourceGroup{}).Where("cluster_name = ?", clusterName).Find(&data).Limit(1).Error
+	if err != nil {
+		return nil, fmt.Errorf("get table [%s] record failed: %v", d.ResourceGroupTableName(ctx), err)
 	}
 	return data, nil
 }

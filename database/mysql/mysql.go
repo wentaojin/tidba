@@ -83,14 +83,14 @@ func (d *Database) GeneralQuery(ctx context.Context, query string, args ...any) 
 
 	rows, err := d.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, nil, fmt.Errorf("query sql: [%v], error: [%v]", query, err)
+		return nil, nil, fmt.Errorf("query sql: [%v], error: %v", query, err)
 	}
 	defer rows.Close()
 
 	// general query, automatic get column name
 	columns, err = rows.Columns()
 	if err != nil {
-		return columns, results, fmt.Errorf("query rows.Columns failed, sql: [%v], error: [%v]", query, err)
+		return columns, results, fmt.Errorf("query rows.Columns failed, sql: [%v], error: %v", query, err)
 	}
 
 	values := make([][]byte, len(columns))
@@ -102,7 +102,7 @@ func (d *Database) GeneralQuery(ctx context.Context, query string, args ...any) 
 	for rows.Next() {
 		err = rows.Scan(scans...)
 		if err != nil {
-			return columns, results, fmt.Errorf("query rows.Scan failed, sql: [%v], error: [%v]", query, err)
+			return columns, results, fmt.Errorf("query rows.Scan failed, sql: [%v], error: %v", query, err)
 		}
 
 		row := make(map[string]string)
@@ -118,7 +118,7 @@ func (d *Database) GeneralQuery(ctx context.Context, query string, args ...any) 
 	}
 
 	if err = rows.Err(); err != nil {
-		return columns, results, fmt.Errorf("query rows.Next failed, sql: [%v], error: [%v]", query, err.Error())
+		return columns, results, fmt.Errorf("query rows.Next failed, sql: [%v], error: %v", query, err.Error())
 	}
 	return columns, results, nil
 }

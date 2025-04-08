@@ -28,7 +28,7 @@ import (
 func main() {
 	// apis := api("120.92.108.85", "54321", `histogram_quantile(0.99, sum(rate(pd_scheduler_handle_region_heartbeat_duration_seconds_bucket{}[1m])) by (address,store,le))`)
 
-	apis := api("120.92.108.85", "54321", `sum(tikv_scheduler_discard_ratio{}) by (instance) / 10000000`)
+	apis := api("10.2.103.77", "9090", `tidb_server_plan_cache_instance_memory_usage{}`)
 
 	maxResp, err := request.Request(request.DefaultRequestMethodGet, apis, nil, "", "")
 	if err != nil {

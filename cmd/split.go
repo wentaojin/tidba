@@ -23,7 +23,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
-	"github.com/wentaojin/tidba/model"
+	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/model/split"
 )
 
@@ -91,9 +91,12 @@ func (a *AppSplitRange) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
-				model.NewConsoleOutput()
+				logger.NewLoggerConsoleOutput(true)
+				defer logger.Sync()
 			} else {
-				model.NewDisableConsoleOutput()
+				// If we're in TUI mode, discard log output
+				logger.NewLoggerConsoleOutput(false)
+				defer logger.Sync()
 			}
 
 			p := tea.NewProgram(
@@ -128,7 +131,7 @@ func (a *AppSplitRange) Cmd() *cobra.Command {
 
 			lModel := teaModel.(split.TableSplitModel)
 			if lModel.Err != nil {
-				fmt.Println(lModel.Err)
+				return lModel.Err
 			}
 			return nil
 		},
@@ -163,10 +166,12 @@ func (a *AppSplitKey) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
-				model.NewConsoleOutput()
+				logger.NewLoggerConsoleOutput(true)
+				defer logger.Sync()
 			} else {
 				// If we're in TUI mode, discard log output
-				model.NewDisableConsoleOutput()
+				logger.NewLoggerConsoleOutput(false)
+				defer logger.Sync()
 			}
 
 			p := tea.NewProgram(
@@ -201,7 +206,7 @@ func (a *AppSplitKey) Cmd() *cobra.Command {
 
 			lModel := teaModel.(split.TableSplitModel)
 			if lModel.Err != nil {
-				fmt.Println(lModel.Err)
+				return lModel.Err
 			}
 			return nil
 		},
@@ -252,10 +257,12 @@ func (a *AppSplitSampling) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
-				model.NewConsoleOutput()
+				logger.NewLoggerConsoleOutput(true)
+				defer logger.Sync()
 			} else {
 				// If we're in TUI mode, discard log output
-				model.NewDisableConsoleOutput()
+				logger.NewLoggerConsoleOutput(false)
+				defer logger.Sync()
 			}
 
 			p := tea.NewProgram(
@@ -296,7 +303,7 @@ func (a *AppSplitSampling) Cmd() *cobra.Command {
 
 			lModel := teaModel.(split.TableSplitModel)
 			if lModel.Err != nil {
-				fmt.Println(lModel.Err)
+				return lModel.Err
 			}
 			return nil
 		},
@@ -360,10 +367,12 @@ func (a *AppSplitEstimate) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
-				model.NewConsoleOutput()
+				logger.NewLoggerConsoleOutput(true)
+				defer logger.Sync()
 			} else {
 				// If we're in TUI mode, discard log output
-				model.NewDisableConsoleOutput()
+				logger.NewLoggerConsoleOutput(false)
+				defer logger.Sync()
 			}
 
 			p := tea.NewProgram(
@@ -405,7 +414,7 @@ func (a *AppSplitEstimate) Cmd() *cobra.Command {
 
 			lModel := teaModel.(split.TableSplitModel)
 			if lModel.Err != nil {
-				fmt.Println(lModel.Err)
+				return lModel.Err
 			}
 			return nil
 		},

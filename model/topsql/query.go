@@ -485,7 +485,7 @@ func GenerateTosqlCpuTimeByComponentServer(ctx context.Context, clusterName, com
 			PlanDigestCounts:     planUniqCounts,
 			SqlDigest:            digest,
 			SqlText:              sqls[0].SqlText,
-			SqlLatencyPercent:    math.Round(float64(cpuTimeMs) / float64(sqlTotalLatency)),
+			SqlLatencyPercent:    RoundToDecimals(float64(cpuTimeMs)/float64(sqlTotalLatency), 4),
 			MaxPlanSqlLatencySec: math.Round(newPlans[len(newPlans)-1].LatencyPerExecMs/1000*100) / 100,
 			MinPlanSqlLatencySec: math.Round(newPlans[0].LatencyPerExecMs/1000*100) / 100,
 		})
@@ -905,4 +905,9 @@ func TopsqlDiagnosis(ctx context.Context, clusterName string, db *mysql.Database
 		rows = append(rows, row)
 	}
 	return rows, nil
+}
+
+func RoundToDecimals(value float64, decimals int) float64 {
+	multiplier := math.Pow(10, float64(decimals))
+	return math.Round(value*multiplier) / multiplier
 }

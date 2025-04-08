@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"math/rand"
 	"os"
 	"sync"
@@ -13,7 +14,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/mattn/go-isatty"
-	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -41,7 +41,7 @@ func main() {
 		opts = []tea.ProgramOption{tea.WithoutRenderer()}
 	} else {
 		// If we're in TUI mode, discard log output
-		log.Logger = log.Output(io.Discard)
+		log.SetOutput(io.Discard)
 	}
 
 	p := tea.NewProgram(newModel(), opts...)

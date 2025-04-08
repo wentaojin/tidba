@@ -22,10 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/wentaojin/tidba/database"
 	"github.com/wentaojin/tidba/database/mysql"
+	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/utils/stringutil"
 	"golang.org/x/sync/errgroup"
 )
@@ -58,14 +57,14 @@ type SplitReqMsg struct {
 
 func RunTableSplitTask(ctx context.Context, clusterName string, req *SplitReqMsg) error {
 	taskStart := time.Now()
-	log.Printf("Cluster [%s] database [%s] connection get...", clusterName, req.Database)
+	logger.Info(fmt.Sprintf("Cluster [%s] database [%s] connection get...", clusterName, req.Database))
 	conn, err := database.Connector.GetDatabase(clusterName)
 	if err != nil {
 		return err
 	}
 	db := conn.(*mysql.Database)
 
-	log.Printf("Cluster [%s] database [%s] table get...", clusterName, req.Database)
+	logger.Info(fmt.Sprintf("Cluster [%s] database [%s] table get...", clusterName, req.Database))
 	schemas, err := db.GetDatabases(ctx)
 	if err != nil {
 		return err
@@ -94,7 +93,7 @@ func RunTableSplitTask(ctx context.Context, clusterName string, req *SplitReqMsg
 		})
 	}
 
-	log.Printf("Cluster [%s] database [%s] table counts [%d]...", clusterName, req.Database, len(tasks))
+	logger.Info(fmt.Sprintf("Cluster [%s] database [%s] table counts [%d]...", clusterName, req.Database, len(tasks)))
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(req.Concurrency)
@@ -130,7 +129,7 @@ func RunTableSplitTask(ctx context.Context, clusterName string, req *SplitReqMsg
 		return err
 	}
 
-	log.Printf("Cluster [%s] database [%s] split task completed in %fs", clusterName, req.Database, time.Since(taskStart).Seconds())
-	log.Printf("Cluster [%s] database [%s] split task output dir to [%s]", clusterName, req.Database, req.Output)
+	logger.Info(fmt.Sprintf("Cluster [%s] database [%s] split task completed in %fs", clusterName, req.Database, time.Since(taskStart).Seconds()))
+	logger.Info(fmt.Sprintf("Cluster [%s] database [%s] split task output dir to [%s]", clusterName, req.Database, req.Output))
 	return nil
 }

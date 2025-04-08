@@ -27,6 +27,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/tidwall/pretty"
 	"github.com/wentaojin/tidba/database"
+	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/model"
 	"github.com/wentaojin/tidba/model/region"
 	"github.com/wentaojin/tidba/utils/stringutil"
@@ -115,8 +116,10 @@ func (a *AppRegionHotspot) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(region.RegionQueryModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil && len(lModel.Msgs.([]*region.QueriedRespMsg)) > 0 {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil && len(lModel.Msgs.([]*region.QueriedRespMsg)) > 0 {
 				fmt.Println("cluster hotspot region content:")
 				for _, m := range lModel.Msgs.([]*region.QueriedRespMsg) {
 					if err := model.QueryResultFormatTableStyle(m.Columns, m.Results); err != nil {
@@ -181,8 +184,10 @@ func (a *AppRegionLeader) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(region.RegionQueryModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil && len(lModel.Msgs.([]*region.QueriedRespMsg)) > 0 {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil && len(lModel.Msgs.([]*region.QueriedRespMsg)) > 0 {
 				fmt.Println("cluster region leader distributed content:")
 				for _, m := range lModel.Msgs.([]*region.QueriedRespMsg) {
 					if err := model.QueryResultFormatTableStyle(m.Columns, m.Results); err != nil {
@@ -232,10 +237,12 @@ func (a *AppRegionReplica) Cmd() *cobra.Command {
 			if a.daemon || !isatty.IsTerminal(os.Stdout.Fd()) {
 				// If we're in daemon mode don't render the TUI
 				opts = []tea.ProgramOption{tea.WithoutRenderer()}
-				model.NewConsoleOutput()
+				logger.NewLoggerConsoleOutput(true)
+				defer logger.Sync()
 			} else {
 				// If we're in TUI mode, discard log output
-				model.NewDisableConsoleOutput()
+				logger.NewLoggerConsoleOutput(false)
+				defer logger.Sync()
 			}
 
 			p := tea.NewProgram(
@@ -259,7 +266,11 @@ func (a *AppRegionReplica) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(region.RegionQueryModel)
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*region.MajorityResp)
 				if reflect.DeepEqual(resp, &region.MajorityResp{}) {
 					fmt.Println("the cluster region replica peers normal, not found major down peers, please ignore and skip")
@@ -349,8 +360,10 @@ func (a *AppRegionQuery) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(region.RegionQueryModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil && len(lModel.Msgs.([]*region.SingleRegion)) > 0 {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil && len(lModel.Msgs.([]*region.SingleRegion)) > 0 {
 				fmt.Println("cluster regions query content:")
 				for _, rs := range lModel.Msgs.([]*region.SingleRegion) {
 					fmt.Println("------")

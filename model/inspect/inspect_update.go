@@ -157,7 +157,7 @@ func (m InspectUpdateModel) View() string {
 		return "✅ Submitted successfully!\n\n"
 	case model.BubblesModeQueried:
 		if m.Error != nil {
-			return fmt.Sprintf("\n❌ Queried error: %s\n", m.Error.Error())
+			return "❌ Queried failed!\n\n"
 		} else {
 			return fmt.Sprintf(
 				"Edit your config (ctrl+s to submit)\n\n%s\n%s",

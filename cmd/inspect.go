@@ -151,7 +151,11 @@ func (a *AppClusterInspectDelete) Cmd() *cobra.Command {
 			}
 			lModel := teaModel.(inspect.InspectDeleteModel)
 
-			if lModel.Error == nil && lModel.Msg != "" {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+
+			if lModel.Msg != "" {
 				fmt.Printf("cluster ispection config content:\n%s", lModel.Msg)
 			}
 			return nil
@@ -194,8 +198,10 @@ func (a *AppClusterInspectUpdate) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(inspect.InspectUpdateModel)
-
-			if lModel.Error == nil && lModel.Msg != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msg != nil {
 				fmt.Printf("cluster ispection config content:\n%s", lModel.Msg.String())
 			}
 			return nil
@@ -237,8 +243,10 @@ func (a *AppClusterInspectQuery) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(inspect.InspectQueryModel)
-
-			if lModel.Error == nil && lModel.Msg != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msg != nil {
 				fmt.Printf("cluster ispection config content:\n%s", lModel.Msg.String())
 			}
 			return nil

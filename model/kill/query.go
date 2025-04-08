@@ -25,11 +25,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/rs/zerolog/log"
+	"go.uber.org/zap"
 	"golang.org/x/sync/errgroup"
 
 	"github.com/wentaojin/tidba/database"
 	"github.com/wentaojin/tidba/database/mysql"
+	"github.com/wentaojin/tidba/logger"
 )
 
 func GenerateKillSessionSqlBySqlDigest(ctx context.Context, clusterName string, sqlDigests []string, duration, interval, concurrency int) error {
@@ -84,12 +85,12 @@ WHERE
 				utime := time.Now()
 				_, results, err := db.GeneralQuery(ctx, queryStr)
 				if err != nil {
-					log.Error().Err(fmt.Errorf("the query str [%s] failed: %v", queryStr, err)).Msg("")
+					logger.Error("query error", zap.String("query", queryStr), zap.Error(err))
 					cancel()
 					return
 				}
 
-				log.Info().Msgf("generate kill sql digest session list finished in %fs", time.Since(utime).Seconds())
+				logger.Info(fmt.Sprintf("generate kill sql digest session list finished in %fs", time.Since(utime).Seconds()))
 
 				g, gCtx := errgroup.WithContext(ctx)
 				g.SetLimit(concurrency)
@@ -101,17 +102,18 @@ WHERE
 						if _, err := db.ExecContext(gCtx, fmt.Sprintf("kill tidb %s", instS[2])); err != nil {
 							return err
 						}
-						log.Info().Msgf("killed session on [%s:%s] with id [%s] finished in %fs", instS[0], instS[1], instS[2], time.Since(stime).Seconds())
+						logger.Info(fmt.Sprintf("killed session on [%s:%s] with id [%s] finished in %fs", instS[0], instS[1], instS[2], time.Since(stime).Seconds()))
 						return nil
 					})
 				}
 				if err := g.Wait(); err != nil {
-					log.Error().Err(fmt.Errorf("the kill session failed: %v", err)).Msg("")
+					logger.Error("kill error", zap.Error(err))
 					cancel()
 					return
 				}
 
-				log.Info().Msgf("killed sql digest session round [%d] finished in %fs", round+1, time.Since(utime).Seconds())
+				round++
+				logger.Info(fmt.Sprintf("killed sql digest session round [%d] finished in %fs", round, time.Since(utime).Seconds()))
 
 				time.Sleep(time.Duration(interval) * time.Millisecond)
 			}
@@ -121,12 +123,12 @@ WHERE
 	select {
 	case <-sigChan:
 		cancel()
-		log.Error().Err(errors.New("receive Ctrl+C signal, interrupt program execution")).Msg("")
+		logger.Error("signal error", zap.Error(errors.New("receive Ctrl+C signal, interrupt program execution")))
 	case <-ctx.Done():
 		if ctx.Err() == context.DeadlineExceeded {
-			log.Error().Err(errors.New("the running time has expired and the program will end automatically")).Msg("")
+			logger.Error("timeout error", zap.Error(fmt.Errorf("the running time has expired [--duration %d] and the program automatically exited", duration)))
 		} else {
-			log.Error().Err(errors.New("the program was canceled by error cancel, the program ends automatically")).Msg("")
+			logger.Error("cancel error", zap.Error(errors.New("the program was canceled by error cancel, the program ends automatically")))
 		}
 	}
 	return nil
@@ -184,12 +186,12 @@ WHERE
 				utime := time.Now()
 				_, results, err := db.GeneralQuery(ctx, queryStr)
 				if err != nil {
-					log.Error().Err(fmt.Errorf("the query str [%s] failed: %v", queryStr, err)).Msg("")
+					logger.Error("query error", zap.String("query", queryStr), zap.Error(err))
 					cancel()
 					return
 				}
 
-				log.Info().Msgf("generate kill username sql digest session list finished in %fs", time.Since(utime).Seconds())
+				logger.Info(fmt.Sprintf("generate kill username sql digest session list finished in %fs", time.Since(utime).Seconds()))
 
 				g, gCtx := errgroup.WithContext(ctx)
 				g.SetLimit(concurrency)
@@ -201,17 +203,17 @@ WHERE
 						if _, err := db.ExecContext(gCtx, fmt.Sprintf("kill tidb %s", instS[2])); err != nil {
 							return err
 						}
-						log.Info().Msgf("killed session on [%s:%s] with id [%s] finished in %fs", instS[0], instS[1], instS[2], time.Since(stime).Seconds())
+						logger.Info(fmt.Sprintf("killed session on [%s:%s] with id [%s] finished in %fs", instS[0], instS[1], instS[2], time.Since(stime).Seconds()))
 						return nil
 					})
 				}
 				if err := g.Wait(); err != nil {
-					log.Error().Err(fmt.Errorf("the kill username session failed: %v", err)).Msg("")
+					logger.Error("kill error", zap.Error(err))
 					cancel()
 					return
 				}
 
-				log.Info().Msgf("killed username sql digest session round [%d] finished in %fs", round+1, time.Since(utime).Seconds())
+				logger.Info(fmt.Sprintf("killed username sql digest session round [%d] finished in %fs", round+1, time.Since(utime).Seconds()))
 
 				time.Sleep(time.Duration(interval) * time.Millisecond)
 			}
@@ -221,12 +223,12 @@ WHERE
 	select {
 	case <-sigChan:
 		cancel()
-		log.Error().Err(errors.New("receive Ctrl+C signal, interrupt program execution")).Msg("")
+		logger.Error("signal error", zap.Error(errors.New("receive Ctrl+C signal, interrupt program execution")))
 	case <-ctx.Done():
 		if ctx.Err() == context.DeadlineExceeded {
-			log.Error().Err(errors.New("the running time has expired and the program will end automatically")).Msg("")
+			logger.Error("timeout error", zap.Error(fmt.Errorf("the running time has expired [--duration %d] and the program automatically exited", duration)))
 		} else {
-			log.Error().Err(errors.New("the program was canceled by error cancel, the program ends automatically")).Msg("")
+			logger.Error("cancel error", zap.Error(errors.New("the program was canceled by error cancel, the program ends automatically")))
 		}
 	}
 	return nil

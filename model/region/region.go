@@ -19,13 +19,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rs/zerolog/log"
-
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/wentaojin/tidba/database"
 	"github.com/wentaojin/tidba/database/mysql"
+	"github.com/wentaojin/tidba/logger"
 	"github.com/wentaojin/tidba/model"
 )
 
@@ -80,7 +79,7 @@ func NewRegionQueryModel(clusterName string,
 }
 
 func (m RegionQueryModel) Init() tea.Cmd {
-	log.Printf("Start Work...\n")
+	logger.Info("Start Work...")
 	return m.spinner.Tick
 }
 
@@ -145,7 +144,7 @@ func (m RegionQueryModel) View() string {
 		)
 	default:
 		if m.Error != nil {
-			return fmt.Sprintf("\n❌ Queried error: %s\n", m.Error.Error())
+			return "❌ Queried failed!\n\n"
 		}
 		return "✅ Queried successfully!\n\n"
 	}

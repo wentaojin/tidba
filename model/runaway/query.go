@@ -20,17 +20,31 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/rs/xid"
+
 	"github.com/wentaojin/tidba/database"
 	"github.com/wentaojin/tidba/database/mysql"
+	"github.com/wentaojin/tidba/database/sqlite"
 	"github.com/wentaojin/tidba/utils/stringutil"
 )
 
 func PrintSqlRunawayComment() {
 	fmt.Println("NOTES：")
-	fmt.Println("- 基于 SQL Digest 自动进行集群级别 SQL 限流，以避免同类 SQL 影响集群整体性能")
+	fmt.Println("- 基于 SQL Digest 自动进行集群级别 SQL 限流 / SQL 拦截 KILL，以避免同类 SQL 影响集群整体性能")
 }
 
-func TopsqlRunaway(ctx context.Context, clusterName string, resourceGroup, sqlDigest, priority string, ruPerSec int) ([]string, []map[string]string, error) {
+func TopsqlRunaway(ctx context.Context, clusterName string, resourceGroup, sqlDigest, priority, sqlText, action string, ruPerSec int) ([]string, []map[string]string, error) {
+	metaDB, err := database.Connector.GetDatabase(database.DefaultSqliteClusterName)
+	if err != nil {
+		return nil, nil, err
+	}
+	meta := metaDB.(*sqlite.Database)
+
+	rc, err := meta.GetResourceGroup(ctx, clusterName)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	connDB, err := database.Connector.GetDatabase(clusterName)
 	if err != nil {
 		return nil, nil, err
@@ -51,34 +65,118 @@ func TopsqlRunaway(ctx context.Context, clusterName string, resourceGroup, sqlDi
 	if err != nil {
 		return nil, nil, err
 	}
+
 	var dbRgNames []string
+	isExistedRc := false
+
 	for _, r := range res {
+		// exclude switch resource group name
+		if r["NAME"] == rc.ResourceGroupName {
+			isExistedRc = true
+			continue
+		}
 		dbRgNames = append(dbRgNames, r["NAME"])
 	}
 
-	if stringutil.IsContainStringIgnoreCase(resourceGroup, dbRgNames) {
-		return nil, nil, fmt.Errorf("the configuration --resource-group [%s] has existed, please re-specify the name of the resource group, the database resource groups: [%v]", resourceGroup, strings.Join(dbRgNames, ","))
-	}
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE RESOURCE GROUP %s RU_PER_SEC = %d PRIORITY=%s", resourceGroup, ruPerSec, priority)); err != nil {
-		return nil, nil, err
-	}
-
 	var limitSql []string
-	for _, r := range dbRgNames {
-		if r == "default" {
-			limitSql = append(limitSql, fmt.Sprintf("query watch add action switch_group(%s) sql digest '%s'", resourceGroup, sqlDigest))
+
+	if strings.EqualFold(action, "kill") {
+		if resourceGroup != "" {
+			if sqlDigest != "" {
+				limitSql = append(limitSql, fmt.Sprintf("QUERY WATCH ADD RESOURCE GROUP %s ACTION KILL SQL DIGEST '%s'", resourceGroup, sqlDigest))
+			}
+			if sqlText != "" {
+				limitSql = append(limitSql, fmt.Sprintf(`QUERY WATCH ADD RESOURCE GROUP %s ACTION KILL SQL TEXT EXACT TO "%s"`, resourceGroup, sqlText))
+			}
 		} else {
-			limitSql = append(limitSql, fmt.Sprintf("query watch add resource group %s action switch_group(%s) sql digest '%s'", r, resourceGroup, sqlDigest))
+			for _, r := range dbRgNames {
+				if r == "default" {
+					if sqlDigest != "" {
+						limitSql = append(limitSql, fmt.Sprintf("QUERY WATCH ADD ACTION KILL SQL DIGEST '%s'", sqlDigest))
+					}
+					if sqlText != "" {
+						limitSql = append(limitSql, fmt.Sprintf(`QUERY WATCH ADD ACTION KILL SQL TEXT EXACT TO "%s"`, sqlText))
+					}
+				} else {
+					if sqlDigest != "" {
+						limitSql = append(limitSql, fmt.Sprintf("QUERY WATCH ADD RESOURCE GROUP %s ACTION KILL SQL DIGEST '%s'", r, sqlDigest))
+					}
+					if sqlText != "" {
+						limitSql = append(limitSql, fmt.Sprintf(`QUERY WATCH ADD RESOURCE GROUP %s ACTION KILL SQL TEXT EXACT TO "%s"`, r, sqlText))
+					}
+				}
+			}
+		}
+	} else {
+		var rcName string
+		// not found record
+		if rc.ResourceGroupName == "" {
+			rcName = xid.New().String()
+			if _, err := meta.CreateResourceGroup(ctx, &sqlite.ResourceGroup{
+				ClusterName:       clusterName,
+				ResourceGroupName: rcName,
+			}); err != nil {
+				return nil, nil, err
+			}
+		} else {
+			rcName = rc.ResourceGroupName
+		}
+
+		if !isExistedRc {
+			if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE RESOURCE GROUP IF NOT EXISTS %s RU_PER_SEC = %d PRIORITY=%s", rcName, ruPerSec, priority)); err != nil {
+				return nil, nil, err
+			}
+		}
+
+		if resourceGroup != "" {
+			if sqlDigest != "" {
+				limitSql = append(limitSql, fmt.Sprintf("QUERY WATCH ADD RESOURCE GROUP %s ACTION SWITCH_GROUP(%s) SQL DIGEST '%s'", resourceGroup, rcName, sqlDigest))
+			}
+			if sqlText != "" {
+				limitSql = append(limitSql, fmt.Sprintf(`QUERY WATCH ADD RESOURCE GROUP %s ACTION SWITCH_GROUP(%s) SQL TEXT EXACT TO "%s"`, resourceGroup, rcName, sqlText))
+			}
+		} else {
+			for _, r := range dbRgNames {
+				if r == "default" {
+					if sqlDigest != "" {
+						limitSql = append(limitSql, fmt.Sprintf("QUERY WATCH ADD ACTION SWITCH_GROUP(%s) SQL DIGEST '%s'", rcName, sqlDigest))
+					}
+					if sqlText != "" {
+						limitSql = append(limitSql, fmt.Sprintf(`QUERY WATCH ADD ACTION SWITCH_GROUP(%s) SQL TEXT EXACT TO "%s"`, rcName, sqlText))
+					}
+				} else {
+					if sqlDigest != "" {
+						limitSql = append(limitSql, fmt.Sprintf("QUERY WATCH ADD RESOURCE GROUP %s ACTION SWITCH_GROUP(%s) SQL DIGEST '%s'", resourceGroup, rcName, sqlDigest))
+					}
+					if sqlText != "" {
+						limitSql = append(limitSql, fmt.Sprintf(`QUERY WATCH ADD RESOURCE GROUP %s ACTION SWITCH_GROUP(%s) SQL TEXT EXACT TO "%s"`, resourceGroup, rcName, sqlText))
+					}
+				}
+			}
 		}
 	}
 
 	for _, s := range limitSql {
 		if _, err := db.ExecContext(ctx, s); err != nil {
-			return nil, nil, err
+			return nil, nil, fmt.Errorf("the query sql [%s] run failed: %v", s, err)
 		}
 	}
 
-	cols, res, err := db.GeneralQuery(ctx, `SELECT * FROM INFORMATION_SCHEMA.RUNAWAY_WATCHES ORDER BY id`)
+	cols, res, err := db.GeneralQuery(ctx, `SELECT
+rw.ID,
+rw.RESOURCE_GROUP_NAME AS RESOURCE_GROUP,
+rw.START_TIME,
+rw.END_TIME,
+rg.RU_PER_SEC,
+rg.PRIORITY,
+rg.QUERY_LIMIT,
+rw.ACTION,
+rw.WATCH_TEXT
+FROM 
+INFORMATION_SCHEMA.RUNAWAY_WATCHES rw,
+INFORMATION_SCHEMA.RESOURCE_GROUPS rg
+WHERE
+rw.RESOURCE_GROUP_NAME = rg.NAME`)
 	if err != nil {
 		return nil, nil, err
 	}

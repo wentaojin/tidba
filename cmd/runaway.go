@@ -63,6 +63,8 @@ type AppRunawayCreate struct {
 	ruPerSec  int
 	priority  string
 	sqlDigest string
+	sqlText   string
+	action    string
 }
 
 func (a *AppRunaway) AppRunawayCreate() Cmder {
@@ -79,36 +81,38 @@ func (a *AppRunawayCreate) Cmd() *cobra.Command {
 				return fmt.Errorf(`the cluster_name cannot be empty, required flag(s) -c {clusterName} not set`)
 			}
 
-			if a.rgName == "" {
-				return fmt.Errorf(`the resource_group cannot be empty, required flag(s) --resource-group {resourceGroupName} not set`)
-			}
-			if a.sqlDigest == "" {
-				return fmt.Errorf(`the sql_digest cannot be empty, required flag(s) --sql-digest {sqlDigest} not set`)
+			if a.sqlDigest == "" && a.sqlText == "" {
+				return fmt.Errorf(`the sql_digest or sql_text cannot be empty, required flag(s) --sql-digest {sqlDigest} or --sql-text {sqlText} not set`)
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			p := tea.NewProgram(runaway.NewSqlRunawayModel(
 				a.clusterName,
-				a.sqlDigest, a.rgName, a.ruPerSec, a.priority, "CREATE", nil,
+				a.sqlDigest, a.rgName, a.ruPerSec, a.priority, "CREATE", a.sqlText, a.action, nil,
 			))
 			teaModel, err := p.Run()
 			if err != nil {
 				return err
 			}
 			lModel := teaModel.(runaway.SqlRunawayModel)
+			if lModel.Error != nil {
+				return lModel.Error
+			}
 
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*runaway.QueriedRespMsg)
 				if reflect.DeepEqual(resp, &runaway.QueriedRespMsg{}) {
 					fmt.Println("the cluster topsql runaway not found, please ignore and skip")
 					return nil
 				}
 
-				runaway.PrintSqlRunawayComment()
-				fmt.Println("\ncluster topsql runaway query content:")
-				if err := model.QueryResultFormatTableStyleWithRowsArray(resp.Columns, resp.Results); err != nil {
-					return err
+				if len(resp.Results) > 0 {
+					runaway.PrintSqlRunawayComment()
+					fmt.Println("\ncluster topsql runaway query content:")
+					if err := model.QueryResultFormatTableStyleWithRowsArray(resp.Columns, resp.Results); err != nil {
+						return err
+					}
 				}
 			}
 			return nil
@@ -117,10 +121,12 @@ func (a *AppRunawayCreate) Cmd() *cobra.Command {
 		SilenceErrors:    true,
 		SilenceUsage:     true,
 	}
-	cmd.Flags().StringVar(&a.rgName, "resource-group", "", "configure the cluster database resource group name")
+	cmd.Flags().StringVar(&a.rgName, "resource-group", "", "configure the cluster database operation resource group name, if not setting, then operation all of the database resource name")
 	cmd.Flags().IntVar(&a.ruPerSec, "ru-per-sec", 5, "configure the cluster database resource group ru_per_sec parameters")
 	cmd.Flags().StringVar(&a.priority, "priority", "low", "configure the cluster database resource group name priority")
 	cmd.Flags().StringVar(&a.sqlDigest, "sql-digest", "", "configure the cluster database resource group with sql digest")
+	cmd.Flags().StringVar(&a.sqlText, "sql-text", "", "configure the cluster database resource group with sql text")
+	cmd.Flags().StringVar(&a.action, "action", "kill", "configure the cluster database resource group action, options: kill / switch")
 	return cmd
 }
 
@@ -150,7 +156,9 @@ func (a *AppRunawayQuery) Cmd() *cobra.Command {
 				"",
 				0,
 				"",
-				"CREATE",
+				"QUERY",
+				"",
+				"",
 				nil,
 			))
 			teaModel, err := p.Run()
@@ -158,17 +166,21 @@ func (a *AppRunawayQuery) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(runaway.SqlRunawayModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*runaway.QueriedRespMsg)
 				if reflect.DeepEqual(resp, &runaway.QueriedRespMsg{}) {
 					fmt.Println("the cluster topsql runaway not found, please ignore and skip")
 					return nil
 				}
 
-				fmt.Println("cluster topsql runaway query content:")
-				if err := model.QueryResultFormatTableStyleWithRowsArray(resp.Columns, resp.Results); err != nil {
-					return err
+				if len(resp.Results) > 0 {
+					fmt.Println("\ncluster topsql runaway query content:")
+					if err := model.QueryResultFormatTableStyleWithRowsArray(resp.Columns, resp.Results); err != nil {
+						return err
+					}
 				}
 			}
 			return nil
@@ -212,6 +224,8 @@ func (a *AppRunawayDelete) Cmd() *cobra.Command {
 				0,
 				"",
 				"DELETE",
+				"",
+				"",
 				a.watchID,
 			))
 			teaModel, err := p.Run()
@@ -219,17 +233,21 @@ func (a *AppRunawayDelete) Cmd() *cobra.Command {
 				return err
 			}
 			lModel := teaModel.(runaway.SqlRunawayModel)
-
-			if lModel.Error == nil && lModel.Msgs != nil {
+			if lModel.Error != nil {
+				return lModel.Error
+			}
+			if lModel.Msgs != nil {
 				resp := lModel.Msgs.(*runaway.QueriedRespMsg)
 				if reflect.DeepEqual(resp, &runaway.QueriedRespMsg{}) {
 					fmt.Println("the cluster topsql runaway not found, please ignore and skip")
 					return nil
 				}
 
-				fmt.Println("cluster topsql runaway query content:")
-				if err := model.QueryResultFormatTableStyleWithRowsArray(resp.Columns, resp.Results); err != nil {
-					return err
+				if len(resp.Results) > 0 {
+					fmt.Println("\ncluster topsql runaway query content:")
+					if err := model.QueryResultFormatTableStyleWithRowsArray(resp.Columns, resp.Results); err != nil {
+						return err
+					}
 				}
 			}
 			return nil

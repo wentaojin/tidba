@@ -141,6 +141,11 @@ func (m TopsqlQueryModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				cmd,
 				submitDiagData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.concurrency, m.enableHistory, m.enableSqlDisplay), // submit list data
 			)
+		case "MEMORY":
+			return m, tea.Batch(
+				cmd,
+				submitMemoryData(m.ctx, m.clusterName, m.nearly, m.startTime, m.endTime, m.top, m.enableHistory, m.enableSqlDisplay), // submit list data
+			)
 		default:
 			return m, tea.Quit
 		}
@@ -157,7 +162,7 @@ func (m TopsqlQueryModel) View() string {
 		)
 	default:
 		if m.Error != nil {
-			return fmt.Sprintf("\n❌ Queried error: %s\n", m.Error.Error())
+			return "❌ Queried failed!\n\n"
 		}
 		return "✅ Queried successfully!\n\n"
 	}
@@ -168,6 +173,7 @@ type listRespMsg struct {
 	err  error
 }
 type QueriedRespMsg struct {
+	MsgType string // only topsql memory used
 	Columns []string
 	Results [][]interface{}
 }
@@ -452,7 +458,7 @@ func submitCpuData(ctx context.Context, clusterName string, nearly int,
 
 			// total sql time percent
 			float := decimal.NewFromFloat(c.SqlLatencyPercent)
-			row = append(row, fmt.Sprintf("%v%%", float.Mul(decimal.NewFromInt(100))))
+			row = append(row, fmt.Sprintf("%v%%", float.Round(4).Mul(decimal.NewFromInt(100)).String()))
 
 			row = append(row, c.SqlDigest)
 			if enableSqlDisplay {
@@ -511,5 +517,18 @@ func submitDiagData(ctx context.Context, clusterName string, nearly int,
 			Columns: columns,
 			Results: newRows,
 		}, err: nil}
+	}
+}
+
+func submitMemoryData(ctx context.Context, clusterName string, nearly int,
+	startTime string,
+	endTime string,
+	top int, enableHistory, enableSqlDisplay bool) tea.Cmd {
+	return func() tea.Msg {
+		resps, err := TopsqlMemoryUsage(ctx, clusterName, nearly, startTime, endTime, top, enableHistory, enableSqlDisplay)
+		if err != nil {
+			return listRespMsg{err: err}
+		}
+		return listRespMsg{msgs: resps, err: nil}
 	}
 }

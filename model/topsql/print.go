@@ -29,7 +29,7 @@ Min query Time(s)：SQL 最小执行耗时
 Max query Time(s)：SQL 最大执行耗时
 Avg total keys：Coprocessor 扫过的 key 的平均数量
 Avg processed keys：Coprocessor 处理的 key 的平均数量。相比 avg_total_keys，avg_processed_keys 不包含 MVCC 的旧版本。如果 avg_total_keys 和 avg_processed_keys 相差很大，说明旧版本比较多
-% Total SQL Time：巡检时间占 SQL 总体耗时占比
+% Total SQL Time：SQL 耗时占时间窗口内所有 SQL 耗时百分比
 SQL Digest：SQL 指纹
 SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enable-sql]`)
 }
@@ -48,7 +48,7 @@ Min query Time(s)：SQL 最小执行耗时
 Max query Time(s)：SQL 最大执行耗时
 Avg total keys：Coprocessor 扫过的 key 的平均数量
 Avg processed keys：Coprocessor 处理的 key 的平均数量。相比 avg_total_keys，avg_processed_keys 不包含 MVCC 的旧版本。如果 avg_total_keys 和 avg_processed_keys 相差很大，说明旧版本比较多
-% Total SQL Time：巡检时间占 SQL 总体耗时占比
+% Total SQL Time：SQL 耗时占时间窗口内所有 SQL 耗时百分比
 SQL Digest：SQL 指纹
 SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enable-sql]`)
 }
@@ -66,7 +66,7 @@ Min sql Plan(s)：耗时最小的执行计划耗时（plan elapsed  , plan diges
 Max sql Plan(s): 耗时最大的执行计划耗时（plan elapsed  , plan digest）
 Avg total keys：Coprocessor 扫过的 key 的平均数量
 Avg processed keys：Coprocessor 处理的 key 的平均数量。相比 avg_total_keys，avg_processed_keys 不包含 MVCC 的旧版本。如果 avg_total_keys 和 avg_processed_keys 相差很大，说明旧版本比较多
-% Total SQL Time：巡检时间占 SQL 总体耗时占比
+% Total SQL Time：SQL 耗时占时间窗口内所有 SQL 耗时百分比
 SQL Digest：SQL 指纹
 SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enable-sql]`)
 }
@@ -123,5 +123,39 @@ TiDB CPU：TiDB 组件 CPU 维度信息，权重占比 25%
 Elapsed：Elapsed SQL 执行总耗时维度信息，权重占比 20%
 Executions：Executions SQL 执行频率维度信息，权重占比 15%
 Plans：Plans SQL 执行计划维度信息，权重占比 5%
+SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enable-sql]`)
+}
+
+func PrintTopsqlMemoryUsageComment(top int) {
+	fmt.Printf("记录时间窗口内 SQL 执行总内存排序 TOP %d，按照从大到小的顺序排列\n", top)
+	fmt.Println("NOTES：")
+	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
+	fmt.Println(`
+Memory Size(MB)：SQL 执行总使用内存
+Executions：SQL 执行总次数
+Mem per Exec(MB)：每次执行平均内存
+Latency per Exec(s)：每次执行平均耗时
+Min query Time(s)：SQL 最小执行耗时
+Max query Time(s)：SQL 最大执行耗时
+% Total SQL Time：SQL 耗时占时间窗口内所有 SQL 耗时百分比
+SQL Digest：SQL 指纹
+SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enable-sql]`)
+}
+
+func PrintTopsqlPlanCacheUsageComment(top int) {
+	fmt.Printf("记录时间窗口内影响 Plan Cache 执行计划缓存使用的 TOP %d，按照从大到小的顺序排列\n", top)
+	fmt.Println("NOTES：")
+	fmt.Println("- 默认以当前 statement_summary 数据表查询，如需使用 history 表，请使用 --enable-history")
+	fmt.Println("- 以 SQL 语句执行次数排序，ONLY 匹配显示 IN OR INSERT INTO VALUES SQL 语句")
+	fmt.Println(`
+Executions：SQL 执行总次数
+Elap per Exec(s)：每次执行平均 SQL 耗时
+Parse per Exec(s)：每次执行平均解析耗时
+Compile per Exec(s)：每次执行平均编译耗时
+Memory per Exec(MB)：每次执行平均内存
+Min query Time(s)：SQL 最小执行耗时
+Max query Time(s)：SQL 最大执行耗时
+% Total SQL Time：SQL 耗时占时间窗口内所有 SQL 耗时百分比
+SQL Digest：SQL 指纹
 SQL Text：SQL 文本 [NOTES：默认字段隐藏，如需显示请使用 --enable-sql]`)
 }
