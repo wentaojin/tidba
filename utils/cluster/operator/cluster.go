@@ -145,46 +145,6 @@ func GetDeployedClusterNodeExporterPorrt(clusterPath string) (string, error) {
 	return strings.ReplaceAll(strings.Trim(stdout.String(), "\n"), " ", ""), nil
 }
 
-type ClusterMetadata struct {
-	Clusters []*Metadata `json:"clusters"`
-}
-
-type Metadata struct {
-	Name       string `json:"name"`
-	User       string `json:"user"`
-	Version    string `json:"version"`
-	Path       string `json:"path"`
-	PrivateKey string `json:"private_key"`
-}
-
-func GetClusterMetadata(clusterName string) (*Metadata, error) {
-	cmd := `tiup cluster list --format json`
-
-	command := exec.Command("/bin/bash", "-c", cmd)
-
-	stdout := new(bytes.Buffer)
-	stderr := new(bytes.Buffer)
-	command.Stdout = stdout
-	command.Stderr = stderr
-
-	err := command.Run()
-	if err != nil {
-		return nil, fmt.Errorf("shell command [%s] exec failed, error: [%v] output: [%v]", cmd, err, stderr.String())
-	}
-	var cl *ClusterMetadata
-	if err := json.Unmarshal(stdout.Bytes(), &cl); err != nil {
-		return nil, err
-	}
-
-	for _, c := range cl.Clusters {
-		if c.Name == clusterName {
-			return c, nil
-		}
-	}
-
-	return nil, fmt.Errorf("the cluster_name [%v] list command not found, please double verify [tiup cluster display %s]", clusterName, clusterName)
-}
-
 type ClusterTopology struct {
 	ClusterMeta *ClusterMeta `json:"cluster_meta"`
 	Instances   []*Instance  `json:"instances"`
