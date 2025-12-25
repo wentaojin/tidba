@@ -66,18 +66,19 @@ const ClusterInspectMinDatabaseVersionRequire = "6.5.0"
 const ClusterInspectMinSplitBucketSchedulerRequire = "7.1.0"
 
 type Insepctor struct {
-	ctx              context.Context
-	startTime        time.Time
-	endTime          time.Time
-	connector        database.Database
-	inspConfig       *InspectConfig
-	label            *operator.ClusterLabel
-	topo             *operator.ClusterTopology
-	logger           *printer.Logger
-	nodeExporterPort string
-	deployUserSshDir string
-	ssh, proxy       *operator.SSHConnectionProps
-	gOpt             *operator.Options
+	ctx                context.Context
+	startTime          time.Time
+	endTime            time.Time
+	connector          database.Database
+	inspConfig         *InspectConfig
+	label              *operator.ClusterLabel
+	topo               *operator.ClusterTopology
+	logger             *printer.Logger
+	nodeExporterPort   string
+	deployUserSshDir   string
+	ssh, proxy         *operator.SSHConnectionProps
+	gOpt               *operator.Options
+	tidbInstanceLogDir map[string]string
 }
 
 func NewInspector(ctx context.Context, clusterPath, clusterName, sshDir string, inspCfg *InspectConfig, l *printer.Logger, s, p *operator.SSHConnectionProps, gOpt *operator.Options) (*Insepctor, error) {
@@ -105,18 +106,67 @@ func NewInspector(ctx context.Context, clusterPath, clusterName, sshDir string, 
 		return nil, fmt.Errorf("invalid cluster [%s] database connector: %v", clusterName, err)
 	}
 
+	meta, err := operator.GetClusterMetadata(clusterName)
+	if err != nil {
+		return nil, err
+	}
+
+	// meta file patch
+	metaTopo, err := operator.LoadYAMLToGeneric(filepath.Join(meta.Path, "meta.yaml"))
+	if err != nil {
+		return nil, err
+	}
+
+	tidbInstanceLogDir := make(map[string]string)
+	// 检查 cluster type 是否为 UbiSQL
+	if strings.EqualFold(topo.ClusterMeta.ClusterType, operator.ComponentNameUbiSQL) {
+		ubisqlLogDirMap, err := operator.GetSubKeyContent(metaTopo, "ubisql_servers", "")
+		// 忽略未找到父key路径的错误，比如：meta.yaml 中没有 ubisql_servers 节点
+		if err != nil && !strings.Contains(err.Error(), "not found parent key path") {
+			return nil, err
+		}
+		if len(ubisqlLogDirMap) == 0 {
+			return nil, fmt.Errorf("compute [ubisql_servers] component instance config not found, please check cluster meta file [%s]", filepath.Join(meta.Path, "meta.yaml"))
+		}
+		ubisqlInsts, err := operator.ParseComputeComponentInstanceLogDir(ubisqlLogDirMap)
+		if err != nil {
+			return nil, fmt.Errorf("parse ubisql component instance config failed, error: %v", err)
+		}
+		for _, inst := range ubisqlInsts {
+			tidbInstanceLogDir[fmt.Sprintf("%s:%d", inst.Host, inst.Port)] = inst.LogDir
+		}
+	} else {
+		// tidb log dir
+		tidbLogDirMap, err := operator.GetSubKeyContent(metaTopo, "tidb_servers", "")
+		// 忽略未找到父key路径的错误，比如：meta.yaml 中没有 tidb_servers 节点
+		if err != nil && !strings.Contains(err.Error(), "not found parent key path") {
+			return nil, err
+		}
+		if len(tidbLogDirMap) == 0 {
+			return nil, fmt.Errorf("compute [tidb_servers] component instance config not found, please check cluster meta file [%s]", filepath.Join(meta.Path, "meta.yaml"))
+		}
+		tidbInsts, err := operator.ParseComputeComponentInstanceLogDir(tidbLogDirMap)
+		if err != nil {
+			return nil, fmt.Errorf("parse tidb component instance config failed, error: %v", err)
+		}
+		for _, inst := range tidbInsts {
+			tidbInstanceLogDir[fmt.Sprintf("%s:%d", inst.Host, inst.Port)] = inst.LogDir
+		}
+	}
+
 	return &Insepctor{
-		ctx:              ctx,
-		connector:        connector,
-		inspConfig:       inspCfg,
-		label:            lb,
-		topo:             topo,
-		logger:           l,
-		gOpt:             gOpt,
-		nodeExporterPort: port,
-		ssh:              s,
-		proxy:            p,
-		deployUserSshDir: sshDir,
+		ctx:                ctx,
+		connector:          connector,
+		inspConfig:         inspCfg,
+		label:              lb,
+		topo:               topo,
+		logger:             l,
+		gOpt:               gOpt,
+		nodeExporterPort:   port,
+		ssh:                s,
+		proxy:              p,
+		deployUserSshDir:   sshDir,
+		tidbInstanceLogDir: tidbInstanceLogDir,
 	}, nil
 }
 
@@ -2264,7 +2314,12 @@ func (i *Insepctor) InspDatabaseErrorCount() ([]*DatabaseErrorCount, error) {
 	}
 
 	for _, inst := range tidbInsts {
-		logFile := fmt.Sprintf("%s/log/tidb.log", inst.DeployDir)
+		var logFile string
+		if val, ok := i.tidbInstanceLogDir[fmt.Sprintf("%s:%d", inst.Host, inst.Port)]; ok {
+			logFile = fmt.Sprintf("%s/tidb.log", val)
+		} else {
+			logFile = fmt.Sprintf("%s/log/tidb.log", inst.DeployDir)
+		}
 
 		tf := task.NewBuilder(i.logger).
 			SSHKeySet(filepath.Join(i.deployUserSshDir, "id_rsa"), filepath.Join(i.deployUserSshDir, "id_rsa.pub")).
