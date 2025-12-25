@@ -870,7 +870,7 @@ func (i *Insepctor) InspClusterSummary() ([]*ClusterSummary, error) {
 
 	for _, r := range res {
 		// Parse start time with timezone
-		startTimestamp, err := time.ParseInLocation("2006-01-02 15:04:05", r["START_TIME"], time.Local)
+		startTimestamp, err := operator.ParseTimeWithLocation(r["START_TIME"], time.Local)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing start time: %v", err)
 		}
