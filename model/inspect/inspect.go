@@ -454,7 +454,6 @@ func (i *Insepctor) InspClusterDatabaseVersion() error {
 	var version string
 	if len(vers) > 1 {
 		tmpVers := strings.Split(strings.TrimPrefix(vers[0], "v"), ".")
-		fmt.Println(tmpVers)
 		version = fmt.Sprintf("%s.%s", tmpVers[len(tmpVers)-1], vers[len(vers)-1])
 	} else {
 		version = strings.TrimPrefix(vers[len(vers)-1], "v")
@@ -1071,7 +1070,6 @@ HAVING
 	var version string
 	if len(vers) > 1 {
 		tmpVers := strings.Split(strings.TrimPrefix(vers[0], "v"), ".")
-		fmt.Println(tmpVers)
 		version = fmt.Sprintf("%s.%s", tmpVers[len(tmpVers)-1], vers[len(vers)-1])
 	} else {
 		version = strings.TrimPrefix(vers[len(vers)-1], "v")
@@ -1954,7 +1952,7 @@ func (i *Insepctor) InspSystemConfig() ([]*SystemConfig, []*SystemConfigOutput, 
 
 			scanner := bufio.NewScanner(strings.NewReader(string(stdout)))
 
-			limitsMap := make(map[string]int)
+			actualLimitsMap := make(map[string]string)
 
 			for scanner.Scan() {
 				line := strings.TrimSpace(scanner.Text())
@@ -1968,27 +1966,24 @@ func (i *Insepctor) InspSystemConfig() ([]*SystemConfig, []*SystemConfigOutput, 
 				}
 
 				key := fmt.Sprintf("%s %s %s", fields[0], fields[1], fields[2])
-				value, err := strconv.Atoi(fields[3])
-				if err != nil {
-					return nil, nil, fmt.Errorf("skipping invalid value in line [%s] failed: %s", line, err)
-				}
 
-				limitsMap[key] = value
+				actualLimitsMap[key] = fields[3]
 			}
 
 			// The check requirement is */deployUser must meet 1 of the following
-			deployUserLimits := make(map[string]int)
-			allUserLimits := make(map[string]int)
+			deployUserLimits := make(map[string]string)
+			allUserLimits := make(map[string]string)
 			for k, v := range DefaultInspLimitsParamsConfigItems() {
 				deployUserLimits[fmt.Sprintf("%s %s", i.topo.ClusterMeta.DeployUser, strings.ReplaceAll(k, " ", " "))] = v
 				allUserLimits[fmt.Sprintf("* %s", strings.ReplaceAll(k, " ", " "))] = v
 			}
 
 			// prioritize checking * all user parameter settings. If they do not exist or the parameter values ​​do not meet the requirements, those that do not meet the requirements will be transferred to the deployment user parameter setting check
-			allNoExpxect := make(map[string]int)
+			allNoExpxect := make(map[string]string)
 			for k, v := range allUserLimits {
-				val, ok := limitsMap[k]
-				if (ok && v != val) || !ok {
+				val, ok := actualLimitsMap[k]
+				// exclude the value is unlimited
+				if (ok && v != val && val != "unlimited") || !ok {
 					keys := strings.Split(k, " ")
 					depKey := fmt.Sprintf("%s %s %s", i.topo.ClusterMeta.DeployUser, keys[1], keys[2])
 					allNoExpxect[depKey] = deployUserLimits[depKey]
@@ -2000,13 +1995,14 @@ func (i *Insepctor) InspSystemConfig() ([]*SystemConfig, []*SystemConfigOutput, 
 			}
 
 			for k, v := range allNoExpxect {
-				val, ok := limitsMap[k]
+				val, ok := actualLimitsMap[k]
 				if ok {
-					if v != val {
-						bs.WriteString(fmt.Sprintf("- %s 期望值 %d，实际值 %d\n", k, v, val))
+					// exclude the value is unlimited
+					if v != val && val != "unlimited" {
+						bs.WriteString(fmt.Sprintf("- %s 期望值 %s，实际值 %s\n", k, v, val))
 					}
 				} else {
-					bs.WriteString(fmt.Sprintf("- %s 未设置, 期望值：%d\n", k, v))
+					bs.WriteString(fmt.Sprintf("- %s 未设置, 期望值：%s\n", k, v))
 				}
 			}
 

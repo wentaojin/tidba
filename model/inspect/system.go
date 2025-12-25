@@ -71,12 +71,12 @@ func DefaultInspSysctlConfigItems() map[string]int64 {
 	}
 }
 
-func DefaultInspLimitsParamsConfigItems() map[string]int {
-	return map[string]int{
-		"soft nofile": 1000000,
-		"hard nofile": 1000000,
-		"soft stack":  32768,
-		"hard stack":  32768,
+func DefaultInspLimitsParamsConfigItems() map[string]string {
+	return map[string]string{
+		"soft nofile": "1000000",
+		"hard nofile": "1000000",
+		"soft stack":  "32768",
+		"hard stack":  "32768",
 	}
 }
 

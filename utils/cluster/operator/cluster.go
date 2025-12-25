@@ -203,6 +203,15 @@ func GetDeployedClusterTopology(clusterName string) (*ClusterTopology, error) {
 	if err := json.Unmarshal(stdout.Bytes(), &cl); err != nil {
 		return nil, err
 	}
+
+	// UbiSQL 组件集群版本映射
+	clusterVersion := cl.ClusterMeta.ClusterVersion
+	if componentVersion, exist := UbiSQLComponentMappingTiDBComponentVersion[clusterVersion]; exist {
+		cl.ClusterMeta.ClusterVersion = componentVersion
+		for _, t := range cl.Instances {
+			t.Version = componentVersion
+		}
+	}
 	return cl, nil
 }
 
