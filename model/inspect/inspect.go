@@ -182,14 +182,14 @@ type Result struct {
 	Values [][]interface{} `json:"values"`
 }
 
-func (i *Insepctor) GetPromRequestAvgValueByNonMetric(req string, resp []byte) (decimal.Decimal, error) {
+func (i *Insepctor) GetPromRequestAvgValueByNonMetric(flag, req string, resp []byte) (decimal.Decimal, error) {
 	var promResp *PromResp
 	if err := json.Unmarshal(resp, &promResp); err != nil {
-		return decimal.Decimal{}, fmt.Errorf("unmarshal prometheus response failed: %v", err)
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
 	if promResp.Status != "success" {
-		return decimal.Decimal{}, fmt.Errorf("prometheus query request [%s] failed, status: [%v]", req, promResp.Status)
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
 	}
 
 	totalRes := decimal.NewFromInt(0)
@@ -222,14 +222,14 @@ func (i *Insepctor) GetPromRequestAvgValueByNonMetric(req string, resp []byte) (
 	return totalRes.DivRound(decimal.NewFromInt(int64(resNums)), 2), nil
 }
 
-func (i *Insepctor) GetPromRequestMaxValueByNonMetric(req string, resp []byte) (decimal.Decimal, error) {
+func (i *Insepctor) GetPromRequestMaxValueByNonMetric(flag, req string, resp []byte) (decimal.Decimal, error) {
 	var promResp *PromResp
 	if err := json.Unmarshal(resp, &promResp); err != nil {
-		return decimal.Decimal{}, fmt.Errorf("unmarsh prometheus response failed: %v", err)
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
 	if promResp.Status != "success" {
-		return decimal.Decimal{}, fmt.Errorf("prometheus query request [%s] failed, status: [%v]", req, promResp.Status)
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
 	}
 
 	maxRes := decimal.NewFromInt(0)
@@ -264,14 +264,14 @@ func (i *Insepctor) GetPromRequestMaxValueByNonMetric(req string, resp []byte) (
 	return maxRes, nil
 }
 
-func (i *Insepctor) GetPromRequestCurrentValueByNonMetric(req string, resp []byte) (decimal.Decimal, error) {
+func (i *Insepctor) GetPromRequestCurrentValueByNonMetric(flag, req string, resp []byte) (decimal.Decimal, error) {
 	var promResp *PromResp
 	if err := json.Unmarshal(resp, &promResp); err != nil {
-		return decimal.Decimal{}, fmt.Errorf("unmarsh prometheus response failed: %v", err)
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
 	if promResp.Status != "success" {
-		return decimal.Decimal{}, fmt.Errorf("prometheus query request [%s] failed, status: [%v]", req, promResp.Status)
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
 	}
 
 	totalRes := decimal.NewFromInt(0)
@@ -301,14 +301,14 @@ func (i *Insepctor) GetPromRequestCurrentValueByNonMetric(req string, resp []byt
 	return totalRes.DivRound(decimal.NewFromInt(int64(resNums)), 2), nil
 }
 
-func (i *Insepctor) GetPromRequestAvgValueByMetric(req string, resp []byte, pdRegionReq ...bool) (map[string]decimal.Decimal, error) {
+func (i *Insepctor) GetPromRequestAvgValueByMetric(flag, req string, resp []byte, pdRegionReq ...bool) (map[string]decimal.Decimal, error) {
 	var promResp *PromResp
 	if err := json.Unmarshal(resp, &promResp); err != nil {
-		return nil, fmt.Errorf("unmarsh prometheus response failed: %v", err)
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
 	if promResp.Status != "success" {
-		return nil, fmt.Errorf("prometheus query request [%s] failed, status: [%v]", req, promResp.Status)
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
 	}
 
 	instAvg := make(map[string]decimal.Decimal)
@@ -348,14 +348,14 @@ func (i *Insepctor) GetPromRequestAvgValueByMetric(req string, resp []byte, pdRe
 	return instAvg, nil
 }
 
-func (i *Insepctor) GetPromRequestAvgDiskValueByMetric(req string, resp []byte) (map[string]map[string]decimal.Decimal, error) {
+func (i *Insepctor) GetPromRequestAvgDiskValueByMetric(flag, req string, resp []byte) (map[string]map[string]decimal.Decimal, error) {
 	var promResp *PromResp
 	if err := json.Unmarshal(resp, &promResp); err != nil {
-		return nil, fmt.Errorf("unmarsh prometheus response failed: %v", err)
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
 	if promResp.Status != "success" {
-		return nil, fmt.Errorf("prometheus query request [%s] failed, status: [%v]", req, promResp.Status)
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
 	}
 
 	instAvg := make(map[string]map[string]decimal.Decimal)
@@ -398,14 +398,14 @@ func (i *Insepctor) GetPromRequestAvgDiskValueByMetric(req string, resp []byte) 
 	return instAvg, nil
 }
 
-func (i *Insepctor) GetPromRequestMaxValueByMetric(req string, resp []byte, pdRegionReq ...bool) (map[string]decimal.Decimal, error) {
+func (i *Insepctor) GetPromRequestMaxValueByMetric(flag, req string, resp []byte, pdRegionReq ...bool) (map[string]decimal.Decimal, error) {
 	var promResp *PromResp
 	if err := json.Unmarshal(resp, &promResp); err != nil {
-		return nil, fmt.Errorf("unmarsh prometheus response failed: %v", err)
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
 	if promResp.Status != "success" {
-		return nil, fmt.Errorf("prometheus query request [%s] failed, status: [%v]", req, promResp.Status)
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
 	}
 
 	instMax := make(map[string]decimal.Decimal)
@@ -644,7 +644,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 				return err
 			}
 
-			regions, err := i.GetPromRequestAvgValueByNonMetric(prompReq, resp)
+			regions, err := i.GetPromRequestAvgValueByNonMetric("pd cluster leader count", prompReq, resp)
 			if err != nil {
 				return err
 			}
@@ -676,7 +676,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 				return err
 			}
 
-			sizes, err := i.GetPromRequestAvgValueByNonMetric(prompReq, resp)
+			sizes, err := i.GetPromRequestAvgValueByNonMetric("pd cluster storage size", prompReq, resp)
 			if err != nil {
 				return err
 			}
@@ -710,7 +710,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 				return err
 			}
 
-			value, err := i.GetPromRequestMaxValueByNonMetric(prompReq, resp)
+			value, err := i.GetPromRequestMaxValueByNonMetric("tidb server max handle query duration", prompReq, resp)
 			if err != nil {
 				return err
 			}
@@ -743,7 +743,7 @@ func (i *Insepctor) InspClusterSoftware() ([]*BasicSoftware, error) {
 				return err
 			}
 
-			value, err := i.GetPromRequestAvgValueByNonMetric(prompReq, resp)
+			value, err := i.GetPromRequestAvgValueByNonMetric("tidb server handle query duration p99", prompReq, resp)
 			if err != nil {
 				return err
 			}
@@ -1012,7 +1012,7 @@ HAVING
 				return err
 			}
 
-			emptyRegions, err := i.GetPromRequestCurrentValueByNonMetric(prompReq, resp)
+			emptyRegions, err := i.GetPromRequestCurrentValueByNonMetric("pd cluster empty region count", prompReq, resp)
 			if err != nil {
 				return err
 			}
@@ -1025,7 +1025,7 @@ HAVING
 			if err != nil {
 				return err
 			}
-			leaderCounts, err := i.GetPromRequestCurrentValueByNonMetric(prompReq, resp)
+			leaderCounts, err := i.GetPromRequestCurrentValueByNonMetric("pd cluster leader count", prompReq, resp)
 			if err != nil {
 				return err
 			}
@@ -1510,6 +1510,7 @@ func (i *Insepctor) InspDatabaseStatistics() ([]*DatabaseStatistics, bool, []*In
 
 	globalExceedFlag := false
 	for seq, dbp := range DefaultInspDatabaseStatisticsItems() {
+		i.logger.Infof(fmt.Sprintf("  - %s", dbp.CheckDesc))
 		if seq == 10 {
 			// stats lock >= v6.5.0
 			if stringutil.VersionOrdinal(version) >= stringutil.VersionOrdinal("8.1.0") {
@@ -1648,7 +1649,7 @@ func (i *Insepctor) InspSystemConfig() ([]*SystemConfig, []*SystemConfigOutput, 
 				return err
 			}
 
-			avgVal, err := i.GetPromRequestAvgDiskValueByMetric("host disk avg wirte latency", avgResp)
+			avgVal, err := i.GetPromRequestAvgDiskValueByMetric("host disk avg wirte latency", diskWriteApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -1696,7 +1697,7 @@ func (i *Insepctor) InspSystemConfig() ([]*SystemConfig, []*SystemConfigOutput, 
 				return err
 			}
 
-			avgVal, err := i.GetPromRequestAvgDiskValueByMetric("host disk avg read latency", avgResp)
+			avgVal, err := i.GetPromRequestAvgDiskValueByMetric("host disk avg read latency", diskReadApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -2486,7 +2487,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 				return err
 			}
 
-			avgVal, err := i.GetPromRequestAvgValueByMetric("pd_server avg cpu", avgResp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("pd server avg cpu", avgApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -2495,7 +2496,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 			if err != nil {
 				return err
 			}
-			maxVal, err := i.GetPromRequestMaxValueByMetric("pd_server max cpu", maxResp)
+			maxVal, err := i.GetPromRequestMaxValueByMetric("pd server max cpu", maxApi, maxResp)
 			if err != nil {
 				return err
 			}
@@ -2546,12 +2547,12 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 				return err
 			}
 
-			avgRegionVal, err := i.GetPromRequestAvgValueByMetric("pd_server avg region heartbeat handle duration", regionResp, true)
+			avgRegionVal, err := i.GetPromRequestAvgValueByMetric("pd server avg region heartbeat handle duration", regionApi, regionResp, true)
 			if err != nil {
 				return err
 			}
 
-			maxRegionVal, err := i.GetPromRequestMaxValueByMetric("pd_server max region heartbeat handle duration", regionResp, true)
+			maxRegionVal, err := i.GetPromRequestMaxValueByMetric("pd server max region heartbeat handle duration", regionApi, regionResp, true)
 			if err != nil {
 				return err
 			}
@@ -2597,12 +2598,12 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 				return err
 			}
 
-			avgRequestVal, err := i.GetPromRequestAvgValueByNonMetric("pd_server avg handle request duration", requestResp)
+			avgRequestVal, err := i.GetPromRequestAvgValueByNonMetric("pd_server avg handle request duration", requestApi, requestResp)
 			if err != nil {
 				return err
 			}
 
-			maxRequestVal, err := i.GetPromRequestMaxValueByNonMetric("pd_server max handle request duration", requestResp)
+			maxRequestVal, err := i.GetPromRequestMaxValueByNonMetric("pd_server max handle request duration", requestApi, requestResp)
 			if err != nil {
 				return err
 			}
@@ -2647,12 +2648,12 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 				return err
 			}
 
-			avgWalVal, err := i.GetPromRequestAvgValueByMetric("pd_server avg wal fsync duration", walResp)
+			avgWalVal, err := i.GetPromRequestAvgValueByMetric("pd server avg wal fsync duration", walApi, walResp)
 			if err != nil {
 				return err
 			}
 
-			maxWalVal, err := i.GetPromRequestMaxValueByMetric("pd_server max wal fsync duration", walResp)
+			maxWalVal, err := i.GetPromRequestMaxValueByMetric("pd server max wal fsync duration", walApi, walResp)
 			if err != nil {
 				return err
 			}
@@ -2794,7 +2795,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			avgVal, err := i.GetPromRequestAvgValueByMetric("tidb_server avg cpu", avgResp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("tidb server avg cpu", avgApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -2802,7 +2803,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxVal, err := i.GetPromRequestMaxValueByMetric("tidb_server max cpu", maxResp)
+			maxVal, err := i.GetPromRequestMaxValueByMetric("tidb server max cpu", maxApi, maxResp)
 			if err != nil {
 				return err
 			}
@@ -2874,7 +2875,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			avgVal, err := i.GetPromRequestAvgValueByMetric("tidb_server avg memory", avgResp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("tidb server avg memory", avgApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -2882,7 +2883,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxVal, err := i.GetPromRequestMaxValueByMetric("tidb_server max memory", maxResp)
+			maxVal, err := i.GetPromRequestMaxValueByMetric("tidb server max memory", maxApi, maxResp)
 			if err != nil {
 				return err
 			}
@@ -2927,12 +2928,12 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			waitAvgVal, err := i.GetPromRequestAvgValueByMetric("tidb_server token wait avg duration", waitResp)
+			waitAvgVal, err := i.GetPromRequestAvgValueByMetric("tidb server token wait avg duration", waitApi, waitResp)
 			if err != nil {
 				return err
 			}
 
-			waitMaxVal, err := i.GetPromRequestMaxValueByMetric("tidb_server token wait max duration", waitResp)
+			waitMaxVal, err := i.GetPromRequestMaxValueByMetric("tidb server token wait max duration", waitApi, waitResp)
 			if err != nil {
 				return err
 			}
@@ -3015,7 +3016,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv_server avg grpc poll cpu", avgResp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv server avg grpc poll cpu", avgApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -3023,7 +3024,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv_server max grpc poll cpu", maxResp)
+			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv server max grpc poll cpu", maxApi, maxResp)
 			if err != nil {
 				return err
 			}
@@ -3056,11 +3057,11 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 
 	i.logger.Infof("  - Inspect tikv component scheduler pool usage")
 
-	avgApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	avgApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3078,7 +3079,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv_server avg scheduler pool size", avgResp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv server avg scheduler pool size", avgApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -3086,7 +3087,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv_server max scheduler pool size", maxResp)
+			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv server max scheduler pool size", maxApi, maxResp)
 			if err != nil {
 				return err
 			}
@@ -3141,7 +3142,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv_server avg unified pool size", avgResp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv server avg unified pool size", avgApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -3149,7 +3150,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv_server max unified pool size", maxResp)
+			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv server max unified pool size", maxApi, maxResp)
 			if err != nil {
 				return err
 			}
@@ -3204,7 +3205,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv_server avg raft store cpu", avgResp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv server avg raft store cpu", avgApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -3212,7 +3213,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv_server max raft store cpu", maxResp)
+			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv server max raft store cpu", maxApi, maxResp)
 			if err != nil {
 				return err
 			}
@@ -3267,7 +3268,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv_server avg raft apply cpu", avgResp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv server avg raft apply cpu", avgApi, avgResp)
 			if err != nil {
 				return err
 			}
@@ -3275,7 +3276,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			if err != nil {
 				return err
 			}
-			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv_server max raft apply cpu", maxResp)
+			maxVal, err := i.GetPromRequestAvgValueByMetric("tikv server max raft apply cpu", maxApi, maxResp)
 			if err != nil {
 				return err
 			}
@@ -3307,7 +3308,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 
 	i.logger.Infof("  - Inspect tikv component scheduler discard ratio")
 
-	maxApi, err = i.GenPrometheusAPIPrefix(`sum(tikv_scheduler_discard_ratio{}) by (instance) / 10000000`, i.startTime, i.endTime)
+	scApi, err := i.GenPrometheusAPIPrefix(`sum(tikv_scheduler_discard_ratio{}) by (instance) / 10000000`, i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3321,17 +3322,17 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 			return true
 		},
 		func() error {
-			resp, err := request.Request(request.DefaultRequestMethodGet, maxApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
+			resp, err := request.Request(request.DefaultRequestMethodGet, scApi, nil, i.topo.ClusterMeta.TlsCaCert, i.topo.ClusterMeta.TlsClientCert, i.topo.ClusterMeta.TlsClientKey)
 			if err != nil {
 				return err
 			}
 
-			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv_server avg scheduler discard ratio", resp)
+			avgVal, err := i.GetPromRequestAvgValueByMetric("tikv server avg scheduler discard ratio", scApi, resp)
 			if err != nil {
 				return err
 			}
 
-			maxVal, err := i.GetPromRequestMaxValueByMetric("tikv_server max scheduler discard ratio", resp)
+			maxVal, err := i.GetPromRequestMaxValueByMetric("tikv server max scheduler discard ratio", scApi, resp)
 			if err != nil {
 				return err
 			}

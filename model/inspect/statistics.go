@@ -24,6 +24,7 @@ type InspDatabaseStatisticsAbnormalOutput struct {
 
 type InspDatabaseStatistics struct {
 	CheckSeq      int
+	CheckDesc     string
 	CheckItem     string
 	CheckStandard string
 	CheckSql      string
@@ -34,6 +35,7 @@ func DefaultInspDatabaseStatisticsItems() []*InspDatabaseStatistics {
 	return []*InspDatabaseStatistics{
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are tables with failed statistics collection",
 			CheckItem:     "是否存在统计信息收集失败的表",
 			CheckStandard: "检查打印出最近 5 个统计信息收集失败的表",
 			CheckSql: `SELECT CONCAT(table_schema, '.', table_name) AS SQL_RESULT FROM 
@@ -63,6 +65,7 @@ INNER JOIN (
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are tables without histograms",
 			CheckItem:     "是否存在没有直方图的表",
 			CheckStandard: "检查打印出没有直方图的表",
 			CheckSql: `SELECT CONCAT(table_schema, '.', table_name) AS SQL_RESULT
@@ -75,6 +78,7 @@ AND tidb_table_id NOT IN (
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are wide tables without setting analyze options",
 			CheckItem:     "是否存在宽表没有设置收集策略",
 			CheckStandard: "宽表(columns > 200)，建议设置正确的收集策略",
 			CheckSql: `SELECT CONCAT(c.table_schema, '.', c.table_name) AS SQL_RESULT
@@ -93,6 +97,7 @@ WHERE o.column_choice IS NULL OR o.column_choice IN ('DEFAULT', 'ALL')`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are partition tables with unreasonable analyze options",
 			CheckItem:     "是否存在分区表统计收集策略不合理",
 			CheckStandard: "在动态分区裁剪模式，分区表(超过 30 个分区)，建议设置正确的收集策略",
 			CheckSql: `SELECT CONCAT(p.table_schema, '.', p.table_name) AS SQL_RESULT 
@@ -109,6 +114,7 @@ WHERE o.column_choice IS NULL OR o.column_choice IN ('DEFAULT', 'ALL')`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are v1/v2 statistics information mixed",
 			CheckItem:     "是否 v1/v2 统计信息并存",
 			CheckStandard: "判断系统 v1/v2 统计信息混用",
 			CheckSql: `SELECT '存在混用' AS SQL_RESULT
@@ -123,20 +129,25 @@ LIMIT 1`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are invalid tables with statistics information",
 			CheckItem:     "是否存在无效表的统计信息",
 			CheckStandard: "检查打印已删除的无效表的统计信息",
-			CheckSql: `SELECT DISTINCT table_id AS SQL_RESULT
-FROM mysql.stats_histograms h 
-WHERE h.table_id NOT IN (
-	SELECT t.tidb_table_id 
-	FROM information_schema.tables t 
-	UNION ALL 
-	SELECT p.TIDB_PARTITION_ID 
-	FROM information_schema.partitions p
+			CheckSql: `SELECT DISTINCT h.table_id AS SQL_RESULT
+FROM mysql.stats_histograms h
+WHERE NOT EXISTS (
+    SELECT 1 
+    FROM information_schema.tables t 
+    WHERE t.tidb_table_id = h.table_id
+)
+AND NOT EXISTS (
+    SELECT 1 
+    FROM information_schema.partitions p 
+    WHERE p.TIDB_PARTITION_ID = h.table_id AND p.tidb_partition_id IS NOT NULL
 )`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are normal tables without statistics information",
 			CheckItem:     "是否存在普通表缺失统计信息",
 			CheckStandard: "检查是否存在普通表缺失统计信息",
 			CheckSql: `WITH tb AS (
@@ -164,6 +175,7 @@ WHERE COALESCE(st.max_stats_ver, 0) = 0`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are partition tables without statistics information",
 			CheckItem:     "是否存在分区缺失 partition 统计信息",
 			CheckStandard: "检查是否存在分区缺失 partition 统计信息",
 			CheckSql: `WITH pt AS (
@@ -192,6 +204,7 @@ WHERE COALESCE(st.max_stats_ver, 0) = 0`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are partition tables without statistics information",
 			CheckItem:     "是否存在分区表缺失 global 统计信息",
 			CheckStandard: "检查是否存在分区表缺失 global 统计信息",
 			CheckSql: `SELECT CONCAT(info2.tb_schema, '.', info2.tb_name) AS SQL_RESULT
@@ -213,6 +226,7 @@ ORDER BY info2.tb_schema, info2.tb_name`,
 		},
 		{
 			CheckSeq:      autoInc.Next(),
+			CheckDesc:     "Inspect whether there are locked statistics information tables",
 			CheckItem:     "是否存在被锁定统计信息的表",
 			CheckStandard: "v6.5 的锁定统计信息不建议使用，建议 v8.1 版本以上使用",
 			CheckSql: `SELECT CONCAT(t.table_schema,'.',t.table_name) AS SQL_RESULT
