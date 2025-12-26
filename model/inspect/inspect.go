@@ -62,8 +62,10 @@ import (
 {username} ALL=(root) NOPASSWD: /usr/bin/bash -c tail*
 */
 
-const ClusterInspectMinDatabaseVersionRequire = "6.5.0"
-const ClusterInspectMinSplitBucketSchedulerRequire = "7.1.0"
+const (
+	ClusterInspectMinDatabaseVersionRequire      = "6.5.0"
+	ClusterInspectMinSplitBucketSchedulerRequire = "7.1.0"
+)
 
 type Insepctor struct {
 	ctx              context.Context
@@ -147,9 +149,13 @@ func (i *Insepctor) GenPrometheusAPIPrefix(qpsQuery string, startTs, endTs time.
 	startTimeStr := strconv.FormatInt(startTs.Unix(), 10)
 	endTimeStr := strconv.FormatInt(endTs.Unix(), 10)
 
+	if endTimeStr < startTimeStr {
+		return "", fmt.Errorf("end time [%s] must be after start time [%s]", endTimeStr, startTimeStr)
+	}
+
 	params.Add("start", startTimeStr)
 	params.Add("end", endTimeStr)
-	params.Add("step", "30s")
+	params.Add("step", CalculateAutoStepByRangeDefaultPanelWidth(startTs, endTs))
 
 	return fmt.Sprintf("%s?%s", baseURL, params.Encode()), nil
 }
@@ -168,8 +174,10 @@ func (i *Insepctor) GenNgMonitorAPIPrefix(startSecs, endSecs int64, accessComp, 
 }
 
 type PromResp struct {
-	Status string `json:"status"`
-	Data   Data   `json:"data"`
+	Status    string `json:"status"`
+	Data      Data   `json:"data"`
+	ErrorType string `json:"errorType"`
+	Error     string `json:"error"`
 }
 
 type Data struct {
@@ -188,8 +196,8 @@ func (i *Insepctor) GetPromRequestAvgValueByNonMetric(flag, req string, resp []b
 		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
-	if promResp.Status != "success" {
-		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
+	if promResp.Status != "success" || promResp.ErrorType != "" || promResp.Error != "" {
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v], errorType: [%v], error: [%v]", flag, req, promResp.Status, promResp.ErrorType, promResp.Error)
 	}
 
 	totalRes := decimal.NewFromInt(0)
@@ -228,8 +236,8 @@ func (i *Insepctor) GetPromRequestMaxValueByNonMetric(flag, req string, resp []b
 		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
-	if promResp.Status != "success" {
-		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
+	if promResp.Status != "success" || promResp.ErrorType != "" || promResp.Error != "" {
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v], errorType: [%v], error: [%v]", flag, req, promResp.Status, promResp.ErrorType, promResp.Error)
 	}
 
 	maxRes := decimal.NewFromInt(0)
@@ -270,8 +278,8 @@ func (i *Insepctor) GetPromRequestCurrentValueByNonMetric(flag, req string, resp
 		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
-	if promResp.Status != "success" {
-		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
+	if promResp.Status != "success" || promResp.ErrorType != "" || promResp.Error != "" {
+		return decimal.Decimal{}, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v], errorType: [%v], error: [%v]", flag, req, promResp.Status, promResp.ErrorType, promResp.Error)
 	}
 
 	totalRes := decimal.NewFromInt(0)
@@ -307,8 +315,8 @@ func (i *Insepctor) GetPromRequestAvgValueByMetric(flag, req string, resp []byte
 		return nil, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
-	if promResp.Status != "success" {
-		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
+	if promResp.Status != "success" || promResp.ErrorType != "" || promResp.Error != "" {
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v], errorType: [%v], error: [%v]", flag, req, promResp.Status, promResp.ErrorType, promResp.Error)
 	}
 
 	instAvg := make(map[string]decimal.Decimal)
@@ -354,8 +362,8 @@ func (i *Insepctor) GetPromRequestAvgDiskValueByMetric(flag, req string, resp []
 		return nil, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
-	if promResp.Status != "success" {
-		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
+	if promResp.Status != "success" || promResp.ErrorType != "" || promResp.Error != "" {
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v], errorType: [%v], error: [%v]", flag, req, promResp.Status, promResp.ErrorType, promResp.Error)
 	}
 
 	instAvg := make(map[string]map[string]decimal.Decimal)
@@ -404,8 +412,8 @@ func (i *Insepctor) GetPromRequestMaxValueByMetric(flag, req string, resp []byte
 		return nil, fmt.Errorf("access [%s] prometheus query request [%s] unmarshal prometheus response failed: %v", flag, req, err)
 	}
 
-	if promResp.Status != "success" {
-		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v]", flag, req, promResp.Status)
+	if promResp.Status != "success" || promResp.ErrorType != "" || promResp.Error != "" {
+		return nil, fmt.Errorf("access [%s] prometheus query request [%s] failed, status: [%v], errorType: [%v], error: [%v]", flag, req, promResp.Status, promResp.ErrorType, promResp.Error)
 	}
 
 	instMax := make(map[string]decimal.Decimal)
@@ -2433,7 +2441,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 				true,
 			).
 			Shell(host, sshCmd, fmt.Sprintf("%s_lscpu", host), true).
-			BuildAsStep(fmt.Sprintf("  - Inspect machine %s lscpu statistics", host))
+			BuildAsStep(fmt.Sprintf("    * Inspect machine %s lscpu statistics", host))
 
 		inspTasks = append(inspTasks, tf)
 	}
@@ -2446,7 +2454,7 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 			i.logger,
 		)
 
-		t := task.NewBuilder(i.logger).ParallelStep("+ Inspect machine lscpu statistics", false, inspTasks...).Build()
+		t := task.NewBuilder(i.logger).ParallelStep("  - Inspect machine lscpu statistics", false, inspTasks...).Build()
 		if err := t.Execute(ctx); err != nil {
 			return nil, fmt.Errorf("failed to fetch machine system lscpu statistics, error detail: %v", err)
 		}
@@ -2464,11 +2472,11 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 
 	i.logger.Infof("  - Inspect pd component cpu usage")
 
-	avgApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`avg_over_time(rate(process_cpu_seconds_total{job="pd"}[1m])[%dm:])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	avgApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`avg_over_time(rate(process_cpu_seconds_total{job="pd"}[1m])[%dm])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`max_over_time(rate(process_cpu_seconds_total{job="pd"}[1m])[%dm:])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`max_over_time(rate(process_cpu_seconds_total{job="pd"}[1m])[%dm])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -2742,7 +2750,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 				true,
 			).
 			Shell(host, sshCmd, fmt.Sprintf("%s_lscpu", host), true).
-			BuildAsStep(fmt.Sprintf("  - Inspect machine %s lscpu statistics", host))
+			BuildAsStep(fmt.Sprintf("    * Inspect machine %s lscpu statistics", host))
 
 		inspTasks = append(inspTasks, tf)
 	}
@@ -2755,7 +2763,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 			i.logger,
 		)
 
-		t := task.NewBuilder(i.logger).ParallelStep("+ Inspect machine lscpu statistics", false, inspTasks...).Build()
+		t := task.NewBuilder(i.logger).ParallelStep("  - Inspect machine lscpu statistics", false, inspTasks...).Build()
 		if err := t.Execute(ctx); err != nil {
 			return nil, fmt.Errorf("failed to fetch machine system lscpu statistics, error detail: %v", err)
 		}
@@ -2773,11 +2781,11 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 
 	i.logger.Infof("  - Inspect tidb component cpu usage")
 
-	avgApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`avg_over_time(rate(process_cpu_seconds_total{job="tidb"}[1m])[%dm:])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	avgApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`avg_over_time(rate(process_cpu_seconds_total{job="tidb"}[1m])[%dm])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`max_over_time(rate(process_cpu_seconds_total{job="tidb"}[1m])[%dm:])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`max_over_time(rate(process_cpu_seconds_total{job="tidb"}[1m])[%dm])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -2998,7 +3006,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"grpc_server.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"grpc_server.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3057,11 +3065,11 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 
 	i.logger.Infof("  - Inspect tikv component scheduler pool usage")
 
-	avgApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	avgApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3124,7 +3132,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"unified_read_po.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"unified_read_po.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3187,7 +3195,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"raftstore_.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"raftstore_.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3250,7 +3258,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"apply_.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"apply_.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
