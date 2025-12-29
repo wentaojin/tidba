@@ -166,7 +166,7 @@ func (i *Insepctor) GenNgMonitorAPIPrefix(startSecs, endSecs int64, accessComp, 
 		return "", err
 	}
 	portSli := strings.Split(promp[0].Ports, "/")
-	if len(portSli) < 4 || len(portSli) > 4 {
+	if len(portSli) < 2 || len(portSli) > 4 {
 		return "", fmt.Errorf("prometheus ng monitor port not found, ports: [%v]", promp[0].Ports)
 	}
 
@@ -2472,11 +2472,11 @@ func (i *Insepctor) InspPerformanceStatisticsByPD() ([]*PerformanceStatisticsByP
 
 	i.logger.Infof("  - Inspect pd component cpu usage")
 
-	avgApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`avg_over_time(rate(process_cpu_seconds_total{job="pd"}[1m])[%dm])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	avgApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`avg_over_time(rate(process_cpu_seconds_total{job="pd"}[1m])[%dm:])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`max_over_time(rate(process_cpu_seconds_total{job="pd"}[1m])[%dm])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`max_over_time(rate(process_cpu_seconds_total{job="pd"}[1m])[%dm:])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -2781,11 +2781,11 @@ func (i *Insepctor) InspPerformanceStatisticsByTiDB() ([]*PerformanceStatisticsB
 
 	i.logger.Infof("  - Inspect tidb component cpu usage")
 
-	avgApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`avg_over_time(rate(process_cpu_seconds_total{job="tidb"}[1m])[%dm])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	avgApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`avg_over_time(rate(process_cpu_seconds_total{job="tidb"}[1m])[%dm:])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`max_over_time(rate(process_cpu_seconds_total{job="tidb"}[1m])[%dm])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`max_over_time(rate(process_cpu_seconds_total{job="tidb"}[1m])[%dm:])`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3006,7 +3006,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"grpc_server.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err := i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"grpc_server.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3065,11 +3065,11 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 
 	i.logger.Infof("  - Inspect tikv component scheduler pool usage")
 
-	avgApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	avgApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)(max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"sched_.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3132,7 +3132,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"unified_read_po.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"unified_read_po.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3195,7 +3195,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"raftstore_.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"raftstore_.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}
@@ -3258,7 +3258,7 @@ func (i *Insepctor) InspPerformanceStatisticsByTiKV() ([]*PerformanceStatisticsB
 	if err != nil {
 		return nil, err
 	}
-	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"apply_.*"}[1m])[%dm]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
+	maxApi, err = i.GenPrometheusAPIPrefix(fmt.Sprintf(`sum by(instance)( max_over_time(rate(tikv_thread_cpu_seconds_total{job="tikv", name=~"apply_.*"}[1m])[%dm:]))`, i.inspConfig.WindowMinutes), i.startTime, i.endTime)
 	if err != nil {
 		return nil, err
 	}

@@ -373,7 +373,7 @@ func (topo *ClusterTopology) GetClusterComponentStatusPortByTopSqlCPU() ([]strin
 		} else if t.ComponentName == ComponentNamePrometheus {
 			portSli := strings.Split(t.Ports, "/")
 
-			if len(portSli) < 4 || len(portSli) > 4 {
+			if len(portSli) < 2 || len(portSli) > 4 {
 				return nil, nil, "", fmt.Errorf("prometheus ng monitor port not found, ports: [%v]", t.Ports)
 			}
 			ngAddr = fmt.Sprintf("%s:%s", t.Host, portSli[len(portSli)-1])
